@@ -1,21 +1,23 @@
 import React, { useState } from "react";
 import { MONO } from "../data";
 import { Button } from "./ui/button";
-import { authAvailable, signIn } from "../lib/weddingAuth";
+import { authAvailable, signIn, authErrorMessage } from "../lib/weddingAuth";
 
-export default function AuthGate() {
+export default function AuthGate({ initialError = "" }) {
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
+  const [error, setError] = useState(initialError);
 
   async function handleSignIn() {
     setBusy(true);
     setError("");
     try {
       await signIn();
-      // bij signInWithRedirect navigeert de pagina weg; bij de popup-terugval
-      // komt onAuthChange vanzelf met de nieuwe gebruiker.
+      // signInWithPopup: bij succes komt onAuthChange vanzelf met de nieuwe
+      // gebruiker; hieronder alleen busy weer uitzetten.
+      setBusy(false);
     } catch (e) {
-      setError("Inloggen is niet gelukt. Probeer het nog eens.");
+      console.error("Inloggen mislukt:", e);
+      setError(authErrorMessage(e));
       setBusy(false);
     }
   }

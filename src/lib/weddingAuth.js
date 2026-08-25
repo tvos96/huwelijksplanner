@@ -1,5 +1,5 @@
 import {
-  signInWithRedirect, signInWithPopup, getRedirectResult, signOut, onAuthStateChanged,
+  signInWithPopup, getRedirectResult, signOut, onAuthStateChanged,
 } from "firebase/auth";
 import {
   doc, getDoc, setDoc, collection, getDocs, addDoc, serverTimestamp, runTransaction,
@@ -14,21 +14,41 @@ export function onAuthChange(cb) {
   return onAuthStateChanged(auth, cb);
 }
 
-/** Start Google-login. Gebruikt een redirect (werkt betrouwbaar als PWA op
- * het beginscherm), met popup als terugval voor omgevingen waar redirect
- * niet lekker werkt (bv. desktop-browser in dit voorbeeld). */
-export async function signIn() {
-  if (!auth) throw new Error("Firebase is niet beschikbaar.");
-  try {
-    await signInWithRedirect(auth, googleProvider);
-  } catch (e) {
-    await signInWithPopup(auth, googleProvider);
-  }
+/** Vertaalt een Firebase Auth-foutcode naar een begrijpelijke melding, zodat
+ * een mislukte login nooit stil blijft hangen zonder uitleg. */
+export function authErrorMessage(e) {
+  const code = e && e.code;
+  if (code === "auth/unauthorized-domain")
+    return "Dit domein staat nog niet toegestaan in Firebase (Authentication → Settings → Authorized domains).";
+  if (code === "auth/popup-blocked")
+    return "De inlog-pop-up werd door de browser geblokkeerd. Sta pop-ups toe voor deze site en probeer opnieuw.";
+  if (code === "auth/popup-closed-by-user" || code === "auth/cancelled-popup-request")
+    return "Inloggen geannuleerd — het inlogvenster is gesloten voordat het klaar was.";
+  if (code === "auth/network-request-failed")
+    return "Geen verbinding met Google — controleer je internetverbinding.";
+  if (code === "auth/web-storage-unsupported" || code === "auth/operation-not-supported-in-this-environment")
+    return "Deze browser/app-omgeving ondersteunt inloggen niet goed. Probeer het in Safari of Chrome zelf (niet in een ingebouwde app-browser).";
+  return "Inloggen is niet gelukt" + (code ? ` (${code})` : "") + ". Probeer het nog eens.";
 }
 
+/** Start Google-login. Gebruikt een pop-up: die geeft direct een resultaat of
+ * duidelijke foutmelding terug op dezelfde pagina. (Een redirect bleek in de
+ * praktijk regelmatig stil vast te lopen — de pagina komt terug na het
+ * inloggen bij Google, maar het resultaat wordt niet altijd herkend, vooral
+ * door hoe browsers opslag tussen de omleiding bewaren. Een pop-up heeft dat
+ * probleem niet.) */
+export async function signIn() {
+  if (!auth) throw new Error("Firebase is niet beschikbaar.");
+  await signInWithPopup(auth, googleProvider);
+}
+
+/** Vangt (indien aanwezig) het resultaat op van een eerdere signInWithRedirect
+ * — bewaard voor het geval een browser toch alsnog naar een redirect
+ * terugvalt. Gooit de echte fout door in plaats van hem stil te negeren, zodat
+ * de aanroeper (main.jsx) hem kan tonen. */
 export async function finishSignInRedirect() {
   if (!auth) return null;
-  try { return await getRedirectResult(auth); } catch { return null; }
+  return await getRedirectResult(auth);
 }
 
 export async function signOutUser() {

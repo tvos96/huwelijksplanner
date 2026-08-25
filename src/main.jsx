@@ -5,7 +5,7 @@ import AuthGate from "./components/AuthGate.jsx";
 import WeddingSetup from "./components/WeddingSetup.jsx";
 import InviteWidget from "./components/InviteWidget.jsx";
 import { MONO } from "./data.js";
-import { onAuthChange, finishSignInRedirect, getUserWeddingId } from "./lib/weddingAuth.js";
+import { onAuthChange, finishSignInRedirect, getUserWeddingId, authErrorMessage } from "./lib/weddingAuth.js";
 import "./index.css";
 
 function Loading() {
@@ -19,12 +19,17 @@ function Loading() {
 function Root() {
   const [ready, setReady] = useState(false);
   const [user, setUser] = useState(null);
+  const [authError, setAuthError] = useState("");
   // undefined = nog niet gecontroleerd, null = gecontroleerd en geen project, string = weddingId
   const [weddingId, setWeddingId] = useState(undefined);
 
   useEffect(() => {
-    // Vangt de gebruiker op na een signInWithRedirect-terugkeer.
-    finishSignInRedirect();
+    // Vangt de gebruiker op na een (eventuele) signInWithRedirect-terugkeer;
+    // een mislukking wordt nu getoond in plaats van stil genegeerd.
+    finishSignInRedirect().catch((e) => {
+      console.error("Redirect-login mislukt:", e);
+      setAuthError(authErrorMessage(e));
+    });
     const unsub = onAuthChange((u) => {
       setUser(u);
       setReady(true);
@@ -40,7 +45,7 @@ function Root() {
   }, [user]);
 
   if (!ready) return <Loading />;
-  if (!user) return <AuthGate />;
+  if (!user) return <AuthGate initialError={authError} />;
   if (weddingId === undefined) return <Loading />;
   if (!weddingId) return <WeddingSetup user={user} onDone={setWeddingId} />;
 

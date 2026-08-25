@@ -61,7 +61,9 @@ Open de Netlify-URL in Safari → deelknop → "Zet op beginscherm".
 Je krijgt het T+I-monogram als icoon en de app opent schermvullend.
 
 ## Inloggen, uitnodigen & wie er bij mag
-Bij de eerste keer openen log je in met **Google**. Heb je nog geen project
+Bij de eerste keer openen log je in met **Google** via een pop-up-venster (zorg
+dat pop-ups voor de site zijn toegestaan — sommige browsers blokkeren dit
+standaard en tonen dan zelf een melding in de adresbalk). Heb je nog geen project
 gekoppeld, dan kies je: een nieuw leeg project starten, de gegevens van de
 oude gedeelde-code-versie overzetten (zie hieronder), of aansluiten met een
 uitnodigingscode van je partner.
