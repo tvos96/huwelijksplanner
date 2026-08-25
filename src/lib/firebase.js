@@ -1,5 +1,6 @@
 import { initializeApp } from "firebase/app";
 import { getFirestore } from "firebase/firestore";
+import { getAuth, GoogleAuthProvider } from "firebase/auth";
 
 // Zelfde Firebase-project als de vorige versie van de app (tim-en-ita-wedding-planner).
 // Dit is de publieke web-config van Firebase — niet geheim; de Firestore-rules
@@ -15,11 +16,17 @@ const firebaseConfig = {
 };
 
 let db = null;
+let auth = null;
+export const googleProvider = new GoogleAuthProvider();
+// Altijd de accountkeuze tonen (handig als je met twee Google-accounts werkt).
+googleProvider.setCustomParameters({ prompt: "select_account" });
+
 try {
   const app = initializeApp(firebaseConfig);
   db = getFirestore(app);
+  auth = getAuth(app);
 } catch (e) {
   console.error("Firebase init mislukt:", e);
 }
 
-export { db };
+export { db, auth };

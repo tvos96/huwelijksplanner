@@ -1,0 +1,82 @@
+rules_version = '2';
+
+// Beveiligingsregels voor de huwelijksplanner.
+//
+// Model: elk huwelijksproject staat in weddings/{weddingId}. Wie erbij mag is
+// vastgelegd in de subcollectie weddings/{weddingId}/members/{uid} — alleen
+// wie daar een document heeft (jij, en wie je uitnodigt) mag de gegevens en
+// foto's lezen en bewerken. Nieuwe leden komen erbij via een tijdelijke,
+// eenmalige uitnodigingscode in invites/{code}.
+//
+// De oude collectie planners/{code} (uit de periode vóór Google-login) staat
+// hieronder alleen nog read-only voor ingelogde gebruikers, puur voor de
+// eenmalige migratie. Verwijder die documenten in de Firebase-console zodra
+// je gemigreerd bent, dan is ook dat laatste restje "iedereen met de code
+// kan erbij" weg.
+//
+// Publiceren: Firebase Console -> Firestore Database -> Rules -> plak dit
+// bestand -> Publish. Test het eerst gerust in het "Rules playground" tabblad
+// (zie de instructies in README.md).
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    match /users/{uid} {
+      allow read, write: if request.auth != null && request.auth.uid == uid;
+    }
+
+    match /weddings/{weddingId} {
+      function isMember() {
+        return request.auth != null &&
+          exists(/databases/$(database)/documents/weddings/$(weddingId)/members/$(request.auth.uid));
+      }
+
+      allow read, update: if isMember();
+      allow create: if request.auth != null && request.auth.uid == request.resource.data.ownerUid;
+      allow delete: if false;
+
+      match /members/{uid} {
+        allow read: if request.auth != null;
+        // Jezelf toevoegen mag alleen als (a) jij de eigenaar bent die net dit
+        // project heeft aangemaakt, of (b) je een geldige, nog ongebruikte
+        // uitnodigingscode voor precies dit project opgeeft.
+        allow create: if request.auth != null && request.auth.uid == uid && (
+          get(/databases/$(database)/documents/weddings/$(weddingId)).data.ownerUid == uid ||
+          (
+            request.resource.data.inviteCode is string &&
+            get(/databases/$(database)/documents/invites/$(request.resource.data.inviteCode)).data.weddingId == weddingId &&
+            get(/databases/$(database)/documents/invites/$(request.resource.data.inviteCode)).data.used == false
+          )
+        );
+        allow update, delete: if false;
+      }
+
+      match /photos/{photoId} {
+        allow read, write: if isMember();
+      }
+    }
+
+    match /invites/{code} {
+      allow read: if request.auth != null;
+      // Alleen een bestaand lid van een project mag daar een uitnodiging voor maken.
+      allow create: if request.auth != null &&
+        exists(/databases/$(database)/documents/weddings/$(request.resource.data.weddingId)/members/$(request.auth.uid));
+      // Een uitnodiging mag maar één keer van "ongebruikt" naar "gebruikt" gaan.
+      allow update: if request.auth != null &&
+        resource.data.used == false &&
+        request.resource.data.used == true &&
+        request.resource.data.weddingId == resource.data.weddingId;
+      allow delete: if false;
+    }
+
+    // Alleen-lezen restant van de oude gedeelde-code-versie, voor de migratie.
+    match /planners/{code} {
+      allow read: if request.auth != null;
+      allow write: if false;
+      match /photos/{photoId} {
+        allow read: if request.auth != null;
+        allow write: if false;
+      }
+    }
+  }
+}

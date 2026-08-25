@@ -1,25 +1,55 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 import App from "./App.jsx";
-import Gate from "./components/Gate.jsx";
+import AuthGate from "./components/AuthGate.jsx";
+import WeddingSetup from "./components/WeddingSetup.jsx";
+import InviteWidget from "./components/InviteWidget.jsx";
+import { MONO } from "./data.js";
+import { onAuthChange, finishSignInRedirect, getUserWeddingId } from "./lib/weddingAuth.js";
 import "./index.css";
 
-const LS_CODE = "ti-planner-code";
+function Loading() {
+  return (
+    <div className="min-h-screen grid place-items-center bg-canvas">
+      <div className="text-center"><img src={MONO} className="h-20 mx-auto opacity-90" alt="" /><p className="mt-3 text-sm text-muted">Even inloggen…</p></div>
+    </div>
+  );
+}
 
 function Root() {
-  const [code, setCode] = useState(() => (localStorage.getItem(LS_CODE) || "").trim().toLowerCase());
+  const [ready, setReady] = useState(false);
+  const [user, setUser] = useState(null);
+  // undefined = nog niet gecontroleerd, null = gecontroleerd en geen project, string = weddingId
+  const [weddingId, setWeddingId] = useState(undefined);
 
-  if (!code) {
-    return (
-      <Gate
-        onSubmit={(v) => {
-          localStorage.setItem(LS_CODE, v);
-          setCode(v);
-        }}
-      />
-    );
-  }
-  return <App code={code} />;
+  useEffect(() => {
+    // Vangt de gebruiker op na een signInWithRedirect-terugkeer.
+    finishSignInRedirect();
+    const unsub = onAuthChange((u) => {
+      setUser(u);
+      setReady(true);
+      if (!u) setWeddingId(undefined);
+    });
+    return unsub;
+  }, []);
+
+  useEffect(() => {
+    if (!user) return;
+    setWeddingId(undefined);
+    getUserWeddingId(user.uid).then(setWeddingId);
+  }, [user]);
+
+  if (!ready) return <Loading />;
+  if (!user) return <AuthGate />;
+  if (weddingId === undefined) return <Loading />;
+  if (!weddingId) return <WeddingSetup user={user} onDone={setWeddingId} />;
+
+  return (
+    <>
+      <InviteWidget weddingId={weddingId} user={user} />
+      <App weddingId={weddingId} />
+    </>
+  );
 }
 
 createRoot(document.getElementById("root")).render(

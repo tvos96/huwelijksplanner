@@ -11,14 +11,15 @@ import { Badge } from "./components/ui/badge";
 import { Input, Textarea } from "./components/ui/input";
 import { Progress } from "./components/ui/progress";
 import { MONO, COUPLE_COLOR, COUPLE_EMPTY, GUEST_SEED, VENUE_SEED, VENUE_COORDS, VENUE_ADDR, SEED_PHOTOS } from "./data";
-import { createPlannerStore, syncAvailable } from "./lib/plannerStore";
+import { createWeddingStore, syncAvailable } from "./lib/plannerStore";
+import { exportExcel, importExcel } from "./lib/excel";
 
 /* ---------- opslag: live gedeeld via Firebase, met localStorage als terugval ---------- */
 const STORE_KEY = "wedding-planner-tim-ita-v2";
 
 const uid = () => Math.random().toString(36).slice(2, 9);
 
-const defaultData = () => ({
+export const defaultData = () => ({
   settings: { partnerA: "Tim", partnerB: "Ita", date: "", location: "" },
   hiddenPhotos: [],
   vendors: [],
@@ -174,8 +175,8 @@ function IconBtn({ onClick, label, children, className }) {
 const FieldLabel = ({ children }) => <label className="mt-3 mb-1 block text-xs font-semibold text-indigo-ink">{children}</label>;
 
 /* ============================================================ */
-export default function WeddingPlanner({ code }) {
-  const store = useMemo(() => (syncAvailable && code ? createPlannerStore(code) : null), [code]);
+export default function WeddingPlanner({ weddingId }) {
+  const store = useMemo(() => (syncAvailable && weddingId ? createWeddingStore(weddingId) : null), [weddingId]);
   const [data, setData] = useState(null);
   const [tab, setTab] = useState("overzicht");
   const [editSettings, setEditSettings] = useState(false);
@@ -844,7 +845,8 @@ function PhotoFeature({ data, setData, store }) {
 /* ---------------- Back-up & herstel ---------------- */
 function BackupWidget({ data, setData }) {
   const [open, setOpen] = useState(false);
-  const fileRef = useRef(null);
+  const jsonFileRef = useRef(null);
+  const excelFileRef = useRef(null);
 
   function download() {
     const json = JSON.stringify(data);
@@ -856,7 +858,7 @@ function BackupWidget({ data, setData }) {
     document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
   }
 
-  function onPick(e) {
+  function onPickJson(e) {
     const file = e.target.files && e.target.files[0];
     e.target.value = "";
     if (!file) return;
@@ -872,16 +874,36 @@ function BackupWidget({ data, setData }) {
     r.readAsText(file);
   }
 
+  function downloadExcel() {
+    const d = new Date(), pad = (x) => String(x).padStart(2, "0");
+    exportExcel(data, "huwelijksplanner-" + d.getFullYear() + pad(d.getMonth() + 1) + pad(d.getDate()) + ".xlsx");
+  }
+
+  async function onPickExcel(e) {
+    const file = e.target.files && e.target.files[0];
+    e.target.value = "";
+    if (!file) return;
+    try {
+      const partial = await importExcel(file);
+      const found = Object.keys(partial).join(", ");
+      if (!confirm(`Gevonden in dit Excel-bestand: ${found}.\nDit vervangt de huidige gegevens voor die onderdelen (ook bij je partner). Doorgaan?`)) return;
+      setData((d) => ({ ...d, ...partial }));
+    } catch (err) { alert("Kon het Excel-bestand niet lezen: " + err.message); }
+  }
+
   return (
     <div className="fixed right-3 z-[800]" style={{ top: "calc(8px + env(safe-area-inset-top))" }}>
-      <input ref={fileRef} type="file" accept="application/json,.json" className="hidden" onChange={onPick} />
+      <input ref={jsonFileRef} type="file" accept="application/json,.json" className="hidden" onChange={onPickJson} />
+      <input ref={excelFileRef} type="file" accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" className="hidden" onChange={onPickExcel} />
       {open && (
-        <div className="absolute right-0 top-12 min-w-[212px] overflow-hidden rounded-xl2 border border-line bg-white shadow-soft">
-          <button className="block w-full border-b border-line/70 px-4 py-3 text-left text-sm font-semibold text-ink hover:bg-canvas" onClick={() => { setOpen(false); download(); }}>⬇︎ Back-up downloaden</button>
-          <button className="block w-full px-4 py-3 text-left text-sm font-semibold text-ink hover:bg-canvas" onClick={() => { setOpen(false); fileRef.current && fileRef.current.click(); }}>⬆︎ Back-up terugzetten</button>
+        <div className="absolute right-0 top-12 min-w-[230px] overflow-hidden rounded-xl2 border border-line bg-white shadow-soft">
+          <button className="block w-full border-b border-line/70 px-4 py-3 text-left text-sm font-semibold text-ink hover:bg-canvas" onClick={() => { setOpen(false); download(); }}>⬇︎ Back-up downloaden (.json)</button>
+          <button className="block w-full border-b border-line/70 px-4 py-3 text-left text-sm font-semibold text-ink hover:bg-canvas" onClick={() => { setOpen(false); jsonFileRef.current && jsonFileRef.current.click(); }}>⬆︎ Back-up terugzetten (.json)</button>
+          <button className="block w-full border-b border-line/70 px-4 py-3 text-left text-sm font-semibold text-ink hover:bg-canvas" onClick={() => { setOpen(false); downloadExcel(); }}>⬇︎ Exporteren naar Excel</button>
+          <button className="block w-full px-4 py-3 text-left text-sm font-semibold text-ink hover:bg-canvas" onClick={() => { setOpen(false); excelFileRef.current && excelFileRef.current.click(); }}>⬆︎ Importeren vanuit Excel</button>
         </div>
       )}
-      <button onClick={() => setOpen((o) => !o)} title="Back-up & herstel"
+      <button onClick={() => setOpen((o) => !o)} title="Back-up, Excel-export/import"
         className="flex h-10 w-10 items-center justify-center rounded-full border border-line bg-white text-rose shadow-soft opacity-85 hover:opacity-100">
         <Cloud size={18} />
       </button>

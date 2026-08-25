@@ -1,6 +1,6 @@
 import {
   doc, getDoc, setDoc, onSnapshot, serverTimestamp,
-  collection, addDoc, deleteDoc, query, orderBy,
+  collection, addDoc, deleteDoc, query, orderBy, getDocs,
 } from "firebase/firestore";
 import { db } from "./firebase";
 
@@ -21,15 +21,16 @@ const CLIENT = getClientId();
 export const syncAvailable = !!db;
 
 /**
- * Maakt een gedeelde-planner-store voor één "code". Alle gegevens (de hele
- * planner-JSON) staan in het document planners/{code}; foto's staan als losse
- * documenten in de subcollectie planners/{code}/photos zodat ze niet de hele
- * planner-listener zwaar maken.
+ * Generieke live-gedeelde-documentstore. `pathSegments` wijst naar één
+ * Firestore-document (bv. ["weddings", weddingId] of ["planners", code]).
+ * Alle plannergegevens staan als JSON-string in dat document; foto's staan
+ * als losse documenten in de subcollectie "photos" eronder, zodat ze niet de
+ * hele planner-listener zwaar maken.
  */
-export function createPlannerStore(code) {
+function createDocStore(pathSegments) {
   let cache = null;
   let selfWriteAt = 0;
-  const ref = db ? doc(db, "planners", code) : null;
+  const ref = db ? doc(db, ...pathSegments) : null;
 
   async function load() {
     if (!ref) return null;
@@ -43,7 +44,7 @@ export function createPlannerStore(code) {
     if (value === cache) return; // geen echte wijziging -> niet schrijven (voorkomt loops)
     cache = value;
     selfWriteAt = Date.now();
-    await setDoc(ref, { json: value, writer: CLIENT, ts: serverTimestamp() });
+    await setDoc(ref, { json: value, writer: CLIENT, ts: serverTimestamp() }, { merge: true });
   }
 
   // onChange(json) wordt alleen aangeroepen bij een wijziging die van de ANDER komt.
@@ -74,7 +75,7 @@ export function createPlannerStore(code) {
   }
 
   function photosRef() {
-    return collection(db, "planners", code, "photos");
+    return collection(db, ...pathSegments, "photos");
   }
 
   function subscribePhotos(onChange) {
@@ -105,8 +106,30 @@ export function createPlannerStore(code) {
 
   async function deletePhoto(id) {
     if (!db) return;
-    await deleteDoc(doc(db, "planners", code, "photos", id));
+    await deleteDoc(doc(db, ...pathSegments, "photos", id));
   }
 
-  return { load, save, subscribe, subscribePhotos, addPhoto, deletePhoto };
+  // Eenmalig alle foto's ophalen (voor migratie), i.p.v. live te abonneren.
+  async function loadPhotosOnce() {
+    if (!db) return [];
+    const snap = await getDocs(photosRef());
+    const list = [];
+    snap.forEach((d) => {
+      const v = d.data();
+      if (v && v.dataUrl) list.push({ dataUrl: v.dataUrl, w: v.w || 0, h: v.h || 0 });
+    });
+    return list;
+  }
+
+  return { load, save, subscribe, subscribePhotos, addPhoto, deletePhoto, loadPhotosOnce, ref };
+}
+
+/** Legacy: gedeelde planner op basis van een geheime code (vóór Google-login). */
+export function createPlannerStore(code) {
+  return createDocStore(["planners", code]);
+}
+
+/** Nieuw: planner gekoppeld aan een geauthenticeerd huwelijksproject. */
+export function createWeddingStore(weddingId) {
+  return createDocStore(["weddings", weddingId]);
 }
