@@ -2,9 +2,10 @@
 
 Een persoonlijke huwelijksplanner (React + Vite) met aftelteller, gastenlijst,
 locaties met kaart, budget, takenlijst en contacten/leveranciers. Installeerbaar
-op je iPhone als app. Je logt in met je Google-account en nodigt je partner uit
-— alleen jullie tweeën kunnen bij de gegevens en foto's. Er staat een
-aanzoeksfoto-slideshow + galerij bovenaan.
+op je iPhone als app. Je logt in met je Google-account, vult jullie namen in en
+nodigt je partner uit — alleen jullie tweeën kunnen bij de gegevens, foto's en
+video's. Elk stel dat inlogt start met hun eigen lege project onder hun eigen
+namen; er wordt niets vooringevuld van andere gebruikers.
 
 ## 1. Lokaal draaien
 Je hebt Node.js 18+ nodig (check met `node -v`).
@@ -65,7 +66,9 @@ Bij de eerste keer openen log je in met **Google** via een pop-up-venster (zorg
 dat pop-ups voor de site zijn toegestaan — sommige browsers blokkeren dit
 standaard en tonen dan zelf een melding in de adresbalk). Heb je nog geen project
 gekoppeld, dan kies je: aansluiten met een uitnodigingscode van je partner, of
-een nieuw leeg project starten.
+een nieuw leeg project starten — daarbij vul je meteen jullie beide namen in.
+Die namen kun je later altijd nog aanpassen via "Bewerken" bij "Onze gegevens"
+op het overzicht.
 
 Eenmaal binnen zit linksboven een 👥-knopje: daar zie je wie er toegang heeft
 en kun je een **uitnodigingscode** genereren om je partner toe te voegen. Die
@@ -96,6 +99,26 @@ Voor het inloggen met Google moet je twee dingen eenmalig aanzetten in de
 Zonder deze drie stappen werkt inloggen niet en/of blijven de oude, open regels
 gelden.
 
+### Foto's & video's
+Bovenaan het overzicht staat een gallerij waar je meteen foto's of korte
+video's kunt toevoegen (vanaf je telefoon of laptop, meerdere tegelijk). Tik op
+een foto of video om 'm groter te bekijken — daar zit ook een sluitknop (✕) en
+een prullenbak om 'm te verwijderen; sluiten brengt je gewoon terug naar de
+rest van de app. Video's zijn beperkt tot een korte clip van een paar seconden
+in lage kwaliteit (ca. 500 KB): de bestanden worden net als foto's rechtstreeks
+in Firestore bewaard, en daar geldt een limiet van 1 MB per document. Grotere
+of langere video's kun je desgewenst delen via een losse link (bijv. Google
+Foto's) in een notitie.
+
+### Leveranciers & contacten
+Net als bij locaties kun je een contact toevoegen via een link: plak de
+Google Maps-link of de website van de leverancier en naam, rol, telefoon en
+e-mail worden waar mogelijk automatisch opgehaald (rol wordt geraden op basis
+van het type bedrijf en woorden als "fotografie" of "catering"). Handmatig
+toevoegen — met of zonder rol — blijft ook gewoon mogelijk, en elk contact is
+te verwijderen. Zodra er contacten met een rol zijn, verschijnt een filterbalk
+waarmee je bijvoorbeeld in één tik al je fotografen kunt bekijken.
+
 ### Back-up & Excel
 Rechtsboven zit een ☁-knopje met vier opties:
 - **Back-up downloaden/terugzetten** — alle gegevens als `.json`-bestand.
@@ -109,17 +132,19 @@ Rechtsboven zit een ☁-knopje met vier opties:
   bewerk dat bestand verder.
 
 ## Structuur
-- `src/App.jsx` — de planner zelf (schermen, tabs, foto-galerij, back-up, Excel)
+- `src/App.jsx` — de planner zelf (schermen, tabs, foto/video-gallerij, back-up, Excel)
 - `src/main.jsx` — startpunt: inloggen → project koppelen → app
 - `src/components/AuthGate.jsx` — Google-inlogscherm
-- `src/components/WeddingSetup.jsx` — nieuw project starten / aansluiten met uitnodigingscode
+- `src/components/WeddingSetup.jsx` — nieuw project starten (met namen) / aansluiten met uitnodigingscode
 - `src/components/InviteWidget.jsx` — wie heeft toegang + partner uitnodigen
 - `src/lib/firebase.js` — Firebase-config en -initialisatie (auth + Firestore)
 - `src/lib/weddingAuth.js` — inloggen, project aanmaken/uitnodigen
-- `src/lib/plannerStore.js` — live opslag/sync van planner-data en foto's
+- `src/lib/plannerStore.js` — live opslag/sync van planner-data, foto's en video's
 - `src/lib/excel.js` — Excel-export/import (vijf tabbladen)
-- `src/data.js` — seed-data (gasten, locaties) en aanzoeksfoto's
-- `public/photos/` — de aanzoeksfoto's (seed van de galerij)
+- `src/data.js` — logo, kaart-hulpdata (venue-coördinaten/adressen); bevat geen
+  persoonlijke gegevens meer — elk nieuw project start leeg
 - `public/` — app-iconen en manifest
 - `firestore.rules` — beveiligingsregels (wie mag wat lezen/schrijven)
+- `netlify/functions/place.js` — locatie-autofetch via Google Maps-link
+- `netlify/functions/vendor.js` — leverancier-autofetch via Maps-link/website
 - `netlify.toml` — deploy-instellingen

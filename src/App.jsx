@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useMemo } from "react";
 import { createPortal } from "react-dom";
 import {
   Heart, Users, MapPin, Wallet, CheckSquare, Star, X, Plus, ExternalLink, Check,
-  Contact, Cloud, Trash2, ChevronLeft, ChevronRight, Phone, Mail,
+  Contact, Cloud, Trash2, ChevronLeft, ChevronRight, Phone, Mail, Play,
 } from "lucide-react";
 import { cn } from "./lib/utils";
 import { Button } from "./components/ui/button";
@@ -10,7 +10,7 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "./com
 import { Badge } from "./components/ui/badge";
 import { Input, Textarea } from "./components/ui/input";
 import { Progress } from "./components/ui/progress";
-import { MONO, COUPLE_COLOR, COUPLE_EMPTY, GUEST_SEED, VENUE_SEED, VENUE_COORDS, VENUE_ADDR, SEED_PHOTOS } from "./data";
+import { MONO, COUPLE_COLOR, COUPLE_EMPTY, VENUE_COORDS, VENUE_ADDR } from "./data";
 import { createWeddingStore, syncAvailable } from "./lib/plannerStore";
 import { exportExcel, importExcel } from "./lib/excel";
 
@@ -19,9 +19,8 @@ const STORE_KEY = "wedding-planner-tim-ita-v2";
 
 const uid = () => Math.random().toString(36).slice(2, 9);
 
-export const defaultData = () => ({
-  settings: { partnerA: "Tim", partnerB: "Ita", date: "", location: "" },
-  hiddenPhotos: [],
+export const defaultData = ({ partnerA = "", partnerB = "" } = {}) => ({
+  settings: { partnerA, partnerB, date: "", location: "" },
   vendors: [],
   schedule: [
     { id: uid(), time: "13:30", label: "Aankomst gasten" },
@@ -32,8 +31,8 @@ export const defaultData = () => ({
     { id: uid(), time: "21:00", label: "Openingsdans" },
     { id: uid(), time: "21:30", label: "Feest" },
   ],
-  guests: GUEST_SEED.map((g) => ({ id: uid(), count: 1, note: "", ...g })),
-  venues: VENUE_SEED.map((v) => ({ id: uid(), ...v })),
+  guests: [],
+  venues: [],
   budget: {
     total: 35000, saved: 10000,
     items: [
@@ -81,6 +80,7 @@ function parseLatLng(s) {
 }
 function parseMapsName(s) { const m = (s || "").match(/\/maps\/place\/([^/@]+)/); if (!m) return ""; try { return decodeURIComponent(m[1].replace(/\+/g, " ")).trim(); } catch { return m[1].replace(/\+/g, " ").trim(); } }
 function isShortMapsLink(s) { return /maps\.app\.goo\.gl|goo\.gl\/maps/i.test(s || ""); }
+function isMapsUrl(s) { return /maps\.google|google\.[a-z.]+\/maps|maps\.app\.goo\.gl|goo\.gl\/maps/i.test(s || ""); }
 function coordsOf(v) { const p = parseLatLng(v.coords); if (p) return p; if (typeof v.lat === "number" && typeof v.lng === "number") return [v.lat, v.lng]; return VENUE_COORDS[v.name] || null; }
 function addrOf(v) { return v.address || VENUE_ADDR[v.name] || ""; }
 
@@ -180,6 +180,7 @@ export default function WeddingPlanner({ weddingId }) {
   const [data, setData] = useState(null);
   const [tab, setTab] = useState("overzicht");
   const [editSettings, setEditSettings] = useState(false);
+  const [resetOpen, setResetOpen] = useState(false);
   const ready = useRef(false);
   const applyingRemote = useRef(false);
 
@@ -265,7 +266,7 @@ export default function WeddingPlanner({ weddingId }) {
         {tab === "contacten" && <Vendors data={data} setData={setData} />}
 
         <div className="mt-8 text-center text-xs text-muted">
-          Gemaakt met liefde · <button className="underline" onClick={() => { if (confirm("Alle gegevens wissen en opnieuw beginnen?")) setData(defaultData()); }}>opnieuw beginnen</button>
+          Gemaakt met liefde · <button className="underline" onClick={() => setResetOpen(true)}>opnieuw beginnen</button>
         </div>
       </div>
 
@@ -281,8 +282,42 @@ export default function WeddingPlanner({ weddingId }) {
           ))}
         </div>
       </nav>
+
+      {resetOpen && (
+        <ResetGuard
+          onCancel={() => setResetOpen(false)}
+          onConfirm={() => {
+            setData(defaultData({ partnerA: data.settings.partnerA, partnerB: data.settings.partnerB }));
+            setResetOpen(false);
+          }}
+        />
+      )}
     </div>
   );
+}
+
+/* ---------------- Guardrail voor "opnieuw beginnen" ---------------- */
+function ResetGuard({ onCancel, onConfirm }) {
+  const [text, setText] = useState("");
+  const ok = text.trim().toLowerCase() === "verwijder";
+  return createPortal((
+    <div className="fixed inset-0 z-[1200] flex items-center justify-center bg-black/50 px-4"
+      onClick={(e) => { if (e.target === e.currentTarget) onCancel(); }}>
+      <div className="w-full max-w-[380px] rounded-2xl bg-white p-5 shadow-lift">
+        <h2 className="text-lg font-bold text-rose-ink">Alles wissen en opnieuw beginnen?</h2>
+        <p className="mt-2 text-sm text-muted">
+          Dit verwijdert permanent jullie gasten, locaties, budget, taken, contacten en foto's/video's — ook bij je
+          partner. Dit kan niet ongedaan gemaakt worden.
+        </p>
+        <p className="mt-3 text-sm font-semibold text-ink">Typ <span className="text-rose-ink">verwijder</span> om te bevestigen:</p>
+        <Input className="mt-1.5" value={text} onChange={(e) => setText(e.target.value)} placeholder="verwijder" autoFocus />
+        <div className="mt-4 flex gap-2">
+          <Button variant="rose" disabled={!ok} onClick={onConfirm}>Ja, alles wissen</Button>
+          <Button variant="ghost" onClick={onCancel}>Annuleren</Button>
+        </div>
+      </div>
+    </div>
+  ), document.body);
 }
 
 /* ---------------- Overzicht ---------------- */
@@ -627,10 +662,36 @@ function Tasks({ data, setData }) {
 function Vendors({ data, setData }) {
   const list = data.vendors || [];
   const ROLES = ["Fotograaf", "Cateraar", "Muziek / DJ", "Bloemist", "Trouwambtenaar", "Taart", "Vervoer", "Decoratie"];
+  const [roleFlt, setRoleFlt] = useState("alle");
+  const [link, setLink] = useState("");
+  const [loading, setLoading] = useState(false);
+
   const upd = (id, f, val) => setData((d) => ({ ...d, vendors: (d.vendors || []).map((x) => x.id === id ? { ...x, [f]: val } : x) }));
-  const add = (role) => setData((d) => ({ ...d, vendors: [...(d.vendors || []), { id: uid(), name: "", role: role || "", phone: "", email: "", price: "", status: "", note: "" }] }));
+  const addVendor = (obj) => setData((d) => ({ ...d, vendors: [{ id: uid(), name: "", role: "", phone: "", email: "", web: "", price: "", status: "", note: "", ...obj }, ...(d.vendors || [])] }));
+  const add = (role) => addVendor({ role: role || "" });
   const del = (id) => setData((d) => ({ ...d, vendors: (d.vendors || []).filter((x) => x.id !== id) }));
   const booked = list.filter((x) => x.status === "geboekt").length;
+
+  // Filterbalk toont alleen rollen die daadwerkelijk voorkomen, zodat je in
+  // één oogopslag bijv. al je fotografen kunt zien.
+  const filterRoles = Array.from(new Set(list.map((x) => x.role).filter(Boolean)))
+    .sort((a, b) => (ROLES.indexOf(a) === -1 ? 99 : ROLES.indexOf(a)) - (ROLES.indexOf(b) === -1 ? 99 : ROLES.indexOf(b)));
+  const shown = roleFlt === "alle" ? list : list.filter((x) => x.role === roleFlt);
+
+  const addFromLink = async () => {
+    const url = link.trim(); if (!url) return; setLoading(true);
+    try {
+      const param = isMapsUrl(url) ? "link=" + encodeURIComponent(url) : "website=" + encodeURIComponent(url);
+      const res = await fetch("/.netlify/functions/vendor?" + param);
+      const d = await res.json();
+      if (res.ok && !d.error) {
+        addVendor({ name: d.name || "Nieuw contact", role: d.role || "", phone: d.phone || "", email: d.email || "", web: d.website || (isMapsUrl(url) ? "" : url) });
+        setLink(""); setLoading(false); return;
+      }
+      alert(d.error || "Kon geen informatie ophalen van deze link.");
+    } catch (e) { alert("Kon geen informatie ophalen van deze link. Voeg 'm handmatig toe."); }
+    setLoading(false);
+  };
 
   return (
     <div className="space-y-4">
@@ -638,19 +699,41 @@ function Vendors({ data, setData }) {
         <CardHeader><CardTitle>Leveranciers &amp; contacten</CardTitle>
           <CardDescription>{list.length} {list.length === 1 ? "contact" : "contacten"} · {booked} geboekt</CardDescription>
         </CardHeader>
+        {filterRoles.length > 0 && (
+          <CardContent>
+            <FieldLabel>Filter op rol</FieldLabel>
+            <div className="mt-1 flex flex-wrap gap-2">
+              <Pill tone="ink" active={roleFlt === "alle"} onClick={() => setRoleFlt("alle")}>Alle ({list.length})</Pill>
+              {filterRoles.map((r) => (
+                <Pill key={r} tone="ink" active={roleFlt === r} onClick={() => setRoleFlt(r)}>{r} ({list.filter((x) => x.role === r).length})</Pill>
+              ))}
+            </div>
+          </CardContent>
+        )}
+      </Card>
+
+      <Card>
+        <CardHeader><CardTitle>Contact toevoegen via link</CardTitle>
+          <CardDescription>Plak een Google Maps-link of de website van de leverancier — naam, rol, telefoon en e-mail worden waar mogelijk automatisch opgehaald.</CardDescription>
+        </CardHeader>
         <CardContent>
-          <FieldLabel>Snel toevoegen</FieldLabel>
+          <div className="flex flex-wrap gap-2">
+            <Input className="min-w-[180px] flex-1" placeholder="Google Maps-link of website (https://...)" value={link} disabled={loading} onChange={(e) => setLink(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") addFromLink(); }} />
+            <Button onClick={addFromLink} disabled={loading || !link.trim()}>{loading ? "Ophalen…" : "Toevoegen via link"}</Button>
+          </div>
+          <FieldLabel>Of handmatig, met rol</FieldLabel>
           <div className="mt-1 flex flex-wrap gap-2">
             {ROLES.map((r) => <button key={r} onClick={() => add(r)} className="rounded-full border border-line px-3 py-1.5 text-xs font-semibold text-muted hover:border-indigo hover:text-indigo-ink">+ {r}</button>)}
           </div>
+          <div className="mt-2"><Button variant="ghost" size="sm" onClick={() => add("")}><Plus size={16} /> Handmatig toevoegen</Button></div>
         </CardContent>
       </Card>
 
-      {list.length === 0 && (
-        <Card><CardContent className="pt-4"><p className="text-sm text-muted">Nog geen contacten. Tik hierboven op een rol om er snel een toe te voegen.</p></CardContent></Card>
+      {shown.length === 0 && (
+        <Card><CardContent className="pt-4"><p className="text-sm text-muted">{list.length === 0 ? "Nog geen contacten. Voeg er hierboven een toe, via een link of handmatig." : "Geen contacten met deze rol."}</p></CardContent></Card>
       )}
 
-      {list.map((x) => (
+      {shown.map((x) => (
         <Card key={x.id}>
           <CardContent className="pt-4">
             <div className="flex items-start gap-2">
@@ -658,7 +741,7 @@ function Vendors({ data, setData }) {
                 <input className="w-full bg-transparent text-lg font-bold focus:outline-none" placeholder="Naam / bedrijf" value={x.name || ""} onChange={(e) => upd(x.id, "name", e.target.value)} />
                 <input className="w-full bg-transparent text-xs text-muted focus:outline-none" placeholder="Rol (bv. Fotograaf)" value={x.role || ""} onChange={(e) => upd(x.id, "role", e.target.value)} />
               </div>
-              <IconBtn label="Verwijderen" onClick={() => del(x.id)}><X size={18} /></IconBtn>
+              <IconBtn label="Verwijderen" onClick={() => { if (confirm("Dit contact verwijderen?")) del(x.id); }}><X size={18} /></IconBtn>
             </div>
             <div className="mt-2 flex flex-wrap gap-2">
               <Pill tone="amber" active={x.status === "optie"} onClick={() => upd(x.id, "status", x.status === "optie" ? "" : "optie")}>Optie</Pill>
@@ -670,22 +753,25 @@ function Vendors({ data, setData }) {
             </div>
             <FieldLabel>E-mail</FieldLabel>
             <Input type="email" placeholder="naam@bedrijf.nl" value={x.email || ""} onChange={(e) => upd(x.id, "email", e.target.value)} />
+            <FieldLabel>Website</FieldLabel>
+            <Input placeholder="https://..." value={x.web || ""} onChange={(e) => upd(x.id, "web", e.target.value)} />
             <FieldLabel>Notitie</FieldLabel>
             <Textarea placeholder="Afspraken, offertelink, etc." value={x.note || ""} onChange={(e) => upd(x.id, "note", e.target.value)} />
             <div className="mt-3 flex flex-wrap gap-4">
               {x.phone && <a className="inline-flex items-center gap-1 text-sm text-indigo-ink underline" href={"tel:" + (x.phone || "").replace(/\s/g, "")}><Phone size={14} /> Bellen</a>}
               {x.email && <a className="inline-flex items-center gap-1 text-sm text-indigo-ink underline" href={"mailto:" + x.email}><Mail size={14} /> Mailen</a>}
+              {x.web && isLink(x.web) && <a className="inline-flex items-center gap-1 text-sm text-indigo-ink underline" target="_blank" rel="noreferrer" href={x.web.startsWith("http") ? x.web : "https://" + x.web}><ExternalLink size={14} /> Website</a>}
             </div>
           </CardContent>
         </Card>
       ))}
-
-      <Button variant="outline" size="sm" onClick={() => add("")}><Plus size={16} /> Leverancier toevoegen</Button>
     </div>
   );
 }
 
-/* ---------------- Aanzoek-foto's: slideshow + galerij ---------------- */
+/* ---------------- Foto's & video's: gallerij ---------------- */
+const MAX_VIDEO_BYTES = 550 * 1024; // Firestore-documentlimiet (1 MiB) laat na base64 maar een paar honderd KB toe
+
 function compressImage(file) {
   return new Promise((resolve, reject) => {
     const img = new Image();
@@ -702,10 +788,27 @@ function compressImage(file) {
       let q = 0.8, dataUrl = canvas.toDataURL("image/jpeg", q);
       while (dataUrl.length > 680 * 1024 && q > 0.42) { q -= 0.1; dataUrl = canvas.toDataURL("image/jpeg", q); }
       while (dataUrl.length > 680 * 1024 && cw > 700) { cw = Math.round(cw * 0.85); ch = Math.round(ch * 0.85); render(); dataUrl = canvas.toDataURL("image/jpeg", 0.62); }
-      resolve({ dataUrl, w: cw, h: ch });
+      resolve({ dataUrl, w: cw, h: ch, type: "image" });
     };
     img.onerror = () => { URL.revokeObjectURL(url); reject(new Error("Kon de afbeelding niet lezen")); };
     img.src = url;
+  });
+}
+
+function readVideo(file) {
+  return new Promise((resolve, reject) => {
+    if (file.size > MAX_VIDEO_BYTES) {
+      reject(new Error(
+        `"${file.name}" is te groot (${Math.round(file.size / 1024)} KB). Video's kunnen hier tot ongeveer ` +
+        `${Math.round(MAX_VIDEO_BYTES / 1024)} KB groot zijn — dat is een korte clip van een paar seconden in lage ` +
+        `kwaliteit. Neem een kortere clip op of comprimeer 'm eerst.`
+      ));
+      return;
+    }
+    const r = new FileReader();
+    r.onload = () => resolve({ dataUrl: String(r.result), w: 0, h: 0, type: "video" });
+    r.onerror = () => reject(new Error(`Kon "${file.name}" niet lezen`));
+    r.readAsDataURL(file);
   });
 }
 
@@ -720,45 +823,36 @@ function useAddedPhotos(store) {
 }
 
 function PhotoFeature({ data, setData, store }) {
-  const added = useAddedPhotos(store);
-  const hidden = data.hiddenPhotos || [];
-  const seeds = SEED_PHOTOS.filter((p) => !hidden.includes(p.src)).map((p) => ({ ...p, seed: true }));
-  const photos = seeds.concat(added);
+  const photos = useAddedPhotos(store);
+  const n = photos.length;
 
-  const [galleryOpen, setGalleryOpen] = useState(false);
   const [viewer, setViewer] = useState(-1);
-  const [idx, setIdx] = useState(0);
   const [busy, setBusy] = useState(false);
   const fileRef = useRef(null);
   const touchX = useRef(null);
-
-  const n = photos.length;
-  const cur = n ? Math.min(idx, n - 1) : 0;
-
-  useEffect(() => {
-    if (n < 2) return;
-    const t = setInterval(() => setIdx((i) => (i + 1) % n), 4000);
-    return () => clearInterval(t);
-  }, [n]);
 
   async function onPick(e) {
     const files = Array.from(e.target.files || []);
     e.target.value = "";
     if (!files.length) return;
-    if (!store) { alert("Foto's toevoegen werkt alleen zodra live-sync actief is."); return; }
+    if (!store) { alert("Foto's en video's toevoegen werkt alleen zodra live-sync actief is."); return; }
     setBusy(true);
+    const errors = [];
     for (const file of files) {
-      try { const r = await compressImage(file); await store.addPhoto(r.dataUrl, r.w, r.h); }
-      catch (err) { console.error(err); }
+      try {
+        const isVideo = file.type.startsWith("video/");
+        const r = isVideo ? await readVideo(file) : await compressImage(file);
+        await store.addPhoto(r.dataUrl, r.w, r.h, r.type);
+      } catch (err) { console.error(err); errors.push(err.message || String(err)); }
     }
     setBusy(false);
+    if (errors.length) alert(errors.join("\n\n"));
   }
 
   function removeAt(i) {
     const p = photos[i];
-    if (!p) return;
-    if (p.seed) setData({ ...data, hiddenPhotos: hidden.concat([p.src]) });
-    else if (store) store.deletePhoto(p.id);
+    if (!p || !store) return;
+    store.deletePhoto(p.id);
     const remaining = n - 1;
     if (remaining <= 0) setViewer(-1);
     else setViewer((v) => Math.min(v, remaining - 1));
@@ -766,57 +860,64 @@ function PhotoFeature({ data, setData, store }) {
 
   function openFiles() { if (fileRef.current) fileRef.current.click(); }
 
+  const fileInput = <input ref={fileRef} type="file" accept="image/*,video/*" multiple className="hidden" onChange={onPick} />;
+
   if (n === 0) {
     return (
       <div className="mx-auto mt-3 max-w-[430px]">
-        <input ref={fileRef} type="file" accept="image/*" multiple className="hidden" onChange={onPick} />
-        <button onClick={openFiles}
+        {fileInput}
+        <button onClick={openFiles} disabled={busy}
           className="flex w-full items-center justify-center rounded-2xl border border-dashed border-line bg-rose-soft font-bold text-rose-ink"
           style={{ aspectRatio: "16/10" }}>
-          ＋ Voeg jullie aanzoeksfoto's toe
+          {busy ? "Bezig met uploaden…" : "＋ Voeg foto's of video's toe"}
         </button>
       </div>
     );
   }
 
+  const VISIBLE = 7;
+  const shown = photos.slice(0, VISIBLE);
+  const more = n - shown.length;
+
   return (
     <div className="mx-auto mt-3 max-w-[430px]">
-      <input ref={fileRef} type="file" accept="image/*" multiple className="hidden" onChange={onPick} />
+      {fileInput}
 
-      <button onClick={() => setGalleryOpen(true)} aria-label="Bekijk foto's"
-        className="relative block w-full overflow-hidden rounded-2xl border border-line bg-rose-soft shadow-soft"
-        style={{ aspectRatio: "16/10" }}>
-        {photos.map((p, i) => (
-          <img key={p.id || p.src} src={p.src} alt="" loading={i === 0 ? undefined : "lazy"}
-            className={cn("absolute inset-0 h-full w-full object-cover transition-opacity duration-1000", i === cur ? "opacity-100" : "opacity-0")} />
+      <div className="mb-1.5 flex items-center justify-between px-0.5">
+        <span className="text-[11px] font-semibold uppercase tracking-wider text-muted">Onze foto's &amp; video's · {n}</span>
+        <button onClick={openFiles} disabled={busy} className="text-xs font-bold text-rose-ink disabled:opacity-50">
+          {busy ? "Bezig…" : "+ Toevoegen"}
+        </button>
+      </div>
+
+      <div className="grid grid-cols-4 gap-1.5">
+        {shown.map((p, i) => (
+          <button key={p.id} onClick={() => setViewer(i)} aria-label="Bekijk"
+            className="relative overflow-hidden rounded-lg border border-line bg-rose-soft" style={{ aspectRatio: "1" }}>
+            {p.type === "video" ? (
+              <video src={p.src} muted playsInline preload="metadata" className="h-full w-full object-cover" />
+            ) : (
+              <img src={p.src} alt="" loading="lazy" className="h-full w-full object-cover" />
+            )}
+            {p.type === "video" && (
+              <span className="absolute inset-0 flex items-center justify-center bg-black/15">
+                <span className="flex h-6 w-6 items-center justify-center rounded-full bg-white/85"><Play size={12} fill="#221E2E" /></span>
+              </span>
+            )}
+          </button>
         ))}
-        <span className="absolute bottom-2.5 left-3 rounded-full bg-black/30 px-3 py-1 text-[13.5px] font-bold text-white backdrop-blur-sm">Het aanzoek 💍</span>
-        <span className="absolute bottom-3 right-2.5 flex gap-1.5">
-          {photos.map((p, i) => <i key={i} className={cn("h-1.5 w-1.5 rounded-full", i === cur ? "bg-white" : "bg-white/55")} />)}
-        </span>
-      </button>
-
-      {galleryOpen && createPortal((
-        <div className="fixed inset-0 z-[1000] flex flex-col bg-canvas" onClick={(e) => { if (e.target === e.currentTarget) setGalleryOpen(false); }}
-          style={{ paddingTop: "env(safe-area-inset-top)", paddingBottom: "env(safe-area-inset-bottom)" }}>
-          <div className="flex items-center justify-between border-b border-line px-4 py-3.5 font-bold text-ink">
-            <span>Onze foto's · {n}</span>
-            <button onClick={() => setGalleryOpen(false)} aria-label="Sluiten" className="p-1 text-muted hover:text-ink"><X size={21} /></button>
-          </div>
-          <div className="grid flex-1 grid-cols-3 content-start gap-1 overflow-y-auto p-1 pb-6">
-            {photos.map((p, i) => (
-              <button key={p.id || p.src} onClick={() => setViewer(i)} className="relative overflow-hidden rounded-md bg-line p-0" style={{ aspectRatio: "1" }}>
-                <img src={p.src} alt="" loading="lazy" className="h-full w-full object-cover" />
-              </button>
-            ))}
-            <button onClick={openFiles} disabled={busy}
-              className="flex flex-col items-center justify-center gap-1 rounded-md bg-rose-soft text-rose-ink" style={{ aspectRatio: "1" }}>
-              <span className="text-2xl font-bold leading-none">{busy ? "…" : "＋"}</span>
-              <small className="px-1 text-center text-[10.5px] font-semibold">{busy ? "uploaden" : "Voeg foto's toe"}</small>
-            </button>
-          </div>
-        </div>
-      ), document.body)}
+        {more > 0 ? (
+          <button onClick={() => setViewer(VISIBLE)} aria-label="Bekijk alles"
+            className="flex items-center justify-center rounded-lg border border-line bg-rose-soft font-bold text-rose-ink" style={{ aspectRatio: "1" }}>
+            +{more}
+          </button>
+        ) : (
+          <button onClick={openFiles} disabled={busy} aria-label="Foto's of video's toevoegen"
+            className="flex flex-col items-center justify-center rounded-lg border border-dashed border-line text-rose-ink" style={{ aspectRatio: "1" }}>
+            <span className="text-xl font-bold leading-none">{busy ? "…" : "＋"}</span>
+          </button>
+        )}
+      </div>
 
       {viewer >= 0 && photos[viewer] && createPortal((
         <div className="fixed inset-0 z-[1100] flex flex-col bg-black/95" onClick={(e) => { if (e.target === e.currentTarget) setViewer(-1); }}
@@ -824,7 +925,7 @@ function PhotoFeature({ data, setData, store }) {
           <div className="flex items-center justify-between px-3.5 py-3 text-white">
             <span className="text-sm font-semibold opacity-90">{viewer + 1} / {n}</span>
             <div className="flex gap-2">
-              <button className="rounded-full bg-white/10 p-2.5 hover:bg-white/20" onClick={() => { if (confirm("Deze foto verwijderen?")) removeAt(viewer); }} aria-label="Verwijderen"><Trash2 size={18} /></button>
+              <button className="rounded-full bg-white/10 p-2.5 hover:bg-white/20" onClick={() => { if (confirm("Dit bestand verwijderen?")) removeAt(viewer); }} aria-label="Verwijderen"><Trash2 size={18} /></button>
               <button className="rounded-full bg-white/10 p-2.5 hover:bg-white/20" onClick={() => setViewer(-1)} aria-label="Sluiten"><X size={18} /></button>
             </div>
           </div>
@@ -833,7 +934,11 @@ function PhotoFeature({ data, setData, store }) {
             onTouchStart={(e) => { touchX.current = e.touches[0].clientX; }}
             onTouchEnd={(e) => { if (touchX.current == null) return; const dx = e.changedTouches[0].clientX - touchX.current; touchX.current = null; if (Math.abs(dx) > 40 && n > 1) setViewer((v) => dx < 0 ? (v + 1) % n : (v - 1 + n) % n); }}>
             {n > 1 && <button className="absolute left-2.5 top-1/2 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-white/15 text-white" onClick={() => setViewer((v) => (v - 1 + n) % n)} aria-label="Vorige"><ChevronLeft size={26} /></button>}
-            <img src={photos[viewer].src} alt="" className="max-h-full max-w-full select-none object-contain" />
+            {photos[viewer].type === "video" ? (
+              <video src={photos[viewer].src} controls autoPlay playsInline className="max-h-full max-w-full" />
+            ) : (
+              <img src={photos[viewer].src} alt="" className="max-h-full max-w-full select-none object-contain" />
+            )}
             {n > 1 && <button className="absolute right-2.5 top-1/2 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-white/15 text-white" onClick={() => setViewer((v) => (v + 1) % n)} aria-label="Volgende"><ChevronRight size={26} /></button>}
           </div>
         </div>

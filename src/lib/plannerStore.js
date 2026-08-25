@@ -88,7 +88,7 @@ function createDocStore(pathSegments) {
           const list = [];
           snap.forEach((d) => {
             const v = d.data();
-            if (v && v.dataUrl) list.push({ id: d.id, src: v.dataUrl, w: v.w || 0, h: v.h || 0 });
+            if (v && v.dataUrl) list.push({ id: d.id, src: v.dataUrl, w: v.w || 0, h: v.h || 0, type: v.type || "image" });
           });
           onChange(list);
         },
@@ -99,9 +99,9 @@ function createDocStore(pathSegments) {
     }
   }
 
-  async function addPhoto(dataUrl, w, h) {
+  async function addPhoto(dataUrl, w, h, type = "image") {
     if (!db) throw new Error("Foto's toevoegen werkt alleen in de online (Netlify) app.");
-    await addDoc(photosRef(), { dataUrl, w, h, createdAt: serverTimestamp() });
+    await addDoc(photosRef(), { dataUrl, w, h, type, createdAt: serverTimestamp() });
   }
 
   async function deletePhoto(id) {
@@ -116,7 +116,7 @@ function createDocStore(pathSegments) {
     const list = [];
     snap.forEach((d) => {
       const v = d.data();
-      if (v && v.dataUrl) list.push({ dataUrl: v.dataUrl, w: v.w || 0, h: v.h || 0 });
+      if (v && v.dataUrl) list.push({ dataUrl: v.dataUrl, w: v.w || 0, h: v.h || 0, type: v.type || "image" });
     });
     return list;
   }

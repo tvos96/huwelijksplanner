@@ -9,13 +9,15 @@ import { defaultData } from "../App";
 export default function WeddingSetup({ user, onDone }) {
   const [mode, setMode] = useState(null); // null | "new" | "join"
   const [inviteCode, setInviteCode] = useState("");
+  const [partnerA, setPartnerA] = useState("");
+  const [partnerB, setPartnerB] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
   async function doCreate() {
     setBusy(true); setError("");
     try {
-      const id = await createWedding(user, JSON.stringify(defaultData()));
+      const id = await createWedding(user, JSON.stringify(defaultData({ partnerA: partnerA.trim(), partnerB: partnerB.trim() })));
       onDone(id);
     } catch (e) { setError(e.message || "Aanmaken is niet gelukt."); setBusy(false); }
   }
@@ -70,11 +72,15 @@ export default function WeddingSetup({ user, onDone }) {
 
         {mode === "new" && (
           <Card className="mt-6">
-            <CardHeader><CardTitle>Nieuw project starten</CardTitle><CardDescription>Je begint met een lege planner. Je partner kan je hierna uitnodigen.</CardDescription></CardHeader>
+            <CardHeader><CardTitle>Nieuw project starten</CardTitle><CardDescription>Vul jullie namen in. Je partner kan je hierna uitnodigen. Je kunt dit later altijd nog aanpassen.</CardDescription></CardHeader>
             <CardContent>
-              {error && <p className="mb-2 text-sm text-rose-ink">{error}</p>}
-              <div className="flex gap-2">
-                <Button disabled={busy} onClick={doCreate}>{busy ? "Bezig…" : "Ja, nieuw project starten"}</Button>
+              <div className="grid grid-cols-2 gap-2">
+                <Input placeholder="Jouw naam" value={partnerA} onChange={(e) => setPartnerA(e.target.value)} />
+                <Input placeholder="Naam partner" value={partnerB} onChange={(e) => setPartnerB(e.target.value)} />
+              </div>
+              {error && <p className="mt-2 text-sm text-rose-ink">{error}</p>}
+              <div className="mt-3 flex gap-2">
+                <Button disabled={busy || !partnerA.trim() || !partnerB.trim()} onClick={doCreate}>{busy ? "Bezig…" : "Nieuw project starten"}</Button>
                 <Button variant="ghost" onClick={() => { setMode(null); setError(""); }}>Terug</Button>
               </div>
             </CardContent>
