@@ -826,10 +826,20 @@ function PhotoFeature({ data, setData, store }) {
   const photos = useAddedPhotos(store);
   const n = photos.length;
 
+  const [galleryOpen, setGalleryOpen] = useState(false);
   const [viewer, setViewer] = useState(-1);
+  const [idx, setIdx] = useState(0);
   const [busy, setBusy] = useState(false);
   const fileRef = useRef(null);
   const touchX = useRef(null);
+
+  const cur = n ? Math.min(idx, n - 1) : 0;
+
+  useEffect(() => {
+    if (n < 2) return;
+    const t = setInterval(() => setIdx((i) => (i + 1) % n), 4000);
+    return () => clearInterval(t);
+  }, [n]);
 
   async function onPick(e) {
     const files = Array.from(e.target.files || []);
@@ -875,49 +885,64 @@ function PhotoFeature({ data, setData, store }) {
     );
   }
 
-  const VISIBLE = 7;
-  const shown = photos.slice(0, VISIBLE);
-  const more = n - shown.length;
-
   return (
     <div className="mx-auto mt-3 max-w-[430px]">
       {fileInput}
 
-      <div className="mb-1.5 flex items-center justify-between px-0.5">
-        <span className="text-[11px] font-semibold uppercase tracking-wider text-muted">Onze foto's &amp; video's · {n}</span>
-        <button onClick={openFiles} disabled={busy} className="text-xs font-bold text-rose-ink disabled:opacity-50">
-          {busy ? "Bezig…" : "+ Toevoegen"}
-        </button>
-      </div>
-
-      <div className="grid grid-cols-4 gap-1.5">
-        {shown.map((p, i) => (
-          <button key={p.id} onClick={() => setViewer(i)} aria-label="Bekijk"
-            className="relative overflow-hidden rounded-lg border border-line bg-rose-soft" style={{ aspectRatio: "1" }}>
-            {p.type === "video" ? (
-              <video src={p.src} muted playsInline preload="metadata" className="h-full w-full object-cover" />
-            ) : (
-              <img src={p.src} alt="" loading="lazy" className="h-full w-full object-cover" />
-            )}
-            {p.type === "video" && (
-              <span className="absolute inset-0 flex items-center justify-center bg-black/15">
-                <span className="flex h-6 w-6 items-center justify-center rounded-full bg-white/85"><Play size={12} fill="#221E2E" /></span>
-              </span>
-            )}
-          </button>
+      <button onClick={() => setGalleryOpen(true)} aria-label="Bekijk foto's en video's"
+        className="relative block w-full overflow-hidden rounded-2xl border border-line bg-rose-soft shadow-soft"
+        style={{ aspectRatio: "16/10" }}>
+        {photos.map((p, i) => (
+          p.type === "video" ? (
+            <video key={p.id} src={p.src} muted loop autoPlay={i === cur} playsInline preload="metadata"
+              className={cn("absolute inset-0 h-full w-full object-cover transition-opacity duration-1000", i === cur ? "opacity-100" : "opacity-0")} />
+          ) : (
+            <img key={p.id} src={p.src} alt="" loading={i === 0 ? undefined : "lazy"}
+              className={cn("absolute inset-0 h-full w-full object-cover transition-opacity duration-1000", i === cur ? "opacity-100" : "opacity-0")} />
+          )
         ))}
-        {more > 0 ? (
-          <button onClick={() => setViewer(VISIBLE)} aria-label="Bekijk alles"
-            className="flex items-center justify-center rounded-lg border border-line bg-rose-soft font-bold text-rose-ink" style={{ aspectRatio: "1" }}>
-            +{more}
-          </button>
-        ) : (
-          <button onClick={openFiles} disabled={busy} aria-label="Foto's of video's toevoegen"
-            className="flex flex-col items-center justify-center rounded-lg border border-dashed border-line text-rose-ink" style={{ aspectRatio: "1" }}>
-            <span className="text-xl font-bold leading-none">{busy ? "…" : "＋"}</span>
-          </button>
+        <span className="absolute bottom-2.5 left-3 rounded-full bg-black/30 px-3 py-1 text-[13.5px] font-bold text-white backdrop-blur-sm">Onze foto's &amp; video's · {n}</span>
+        {n > 1 && (
+          <span className="absolute bottom-3 right-2.5 flex gap-1.5">
+            {photos.map((p, i) => <i key={i} className={cn("h-1.5 w-1.5 rounded-full", i === cur ? "bg-white" : "bg-white/55")} />)}
+          </span>
         )}
-      </div>
+        <span onClick={(e) => { e.stopPropagation(); openFiles(); }}
+          className="absolute right-2.5 top-2.5 flex h-8 w-8 items-center justify-center rounded-full bg-white/85 font-bold text-rose-ink shadow-soft">
+          {busy ? "…" : "＋"}
+        </span>
+      </button>
+
+      {galleryOpen && createPortal((
+        <div className="fixed inset-0 z-[1000] flex flex-col bg-canvas" onClick={(e) => { if (e.target === e.currentTarget) setGalleryOpen(false); }}
+          style={{ paddingTop: "env(safe-area-inset-top)", paddingBottom: "env(safe-area-inset-bottom)" }}>
+          <div className="flex items-center justify-between border-b border-line px-4 py-3.5 font-bold text-ink">
+            <span>Onze foto's &amp; video's · {n}</span>
+            <button onClick={() => setGalleryOpen(false)} aria-label="Sluiten" className="p-1 text-muted hover:text-ink"><X size={21} /></button>
+          </div>
+          <div className="grid flex-1 grid-cols-3 content-start gap-1 overflow-y-auto p-1 pb-6">
+            {photos.map((p, i) => (
+              <button key={p.id} onClick={() => setViewer(i)} className="relative overflow-hidden rounded-md bg-line p-0" style={{ aspectRatio: "1" }}>
+                {p.type === "video" ? (
+                  <video src={p.src} muted playsInline preload="metadata" className="h-full w-full object-cover" />
+                ) : (
+                  <img src={p.src} alt="" loading="lazy" className="h-full w-full object-cover" />
+                )}
+                {p.type === "video" && (
+                  <span className="absolute inset-0 flex items-center justify-center bg-black/15">
+                    <span className="flex h-6 w-6 items-center justify-center rounded-full bg-white/85"><Play size={12} fill="#221E2E" /></span>
+                  </span>
+                )}
+              </button>
+            ))}
+            <button onClick={openFiles} disabled={busy}
+              className="flex flex-col items-center justify-center gap-1 rounded-md bg-rose-soft text-rose-ink" style={{ aspectRatio: "1" }}>
+              <span className="text-2xl font-bold leading-none">{busy ? "…" : "＋"}</span>
+              <small className="px-1 text-center text-[10.5px] font-semibold">{busy ? "uploaden" : "Voeg toe"}</small>
+            </button>
+          </div>
+        </div>
+      ), document.body)}
 
       {viewer >= 0 && photos[viewer] && createPortal((
         <div className="fixed inset-0 z-[1100] flex flex-col bg-black/95" onClick={(e) => { if (e.target === e.currentTarget) setViewer(-1); }}

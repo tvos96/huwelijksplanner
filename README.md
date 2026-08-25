@@ -100,15 +100,17 @@ Zonder deze drie stappen werkt inloggen niet en/of blijven de oude, open regels
 gelden.
 
 ### Foto's & video's
-Bovenaan het overzicht staat een gallerij waar je meteen foto's of korte
-video's kunt toevoegen (vanaf je telefoon of laptop, meerdere tegelijk). Tik op
-een foto of video om 'm groter te bekijken — daar zit ook een sluitknop (✕) en
-een prullenbak om 'm te verwijderen; sluiten brengt je gewoon terug naar de
-rest van de app. Video's zijn beperkt tot een korte clip van een paar seconden
-in lage kwaliteit (ca. 500 KB): de bestanden worden net als foto's rechtstreeks
-in Firestore bewaard, en daar geldt een limiet van 1 MB per document. Grotere
-of langere video's kun je desgewenst delen via een losse link (bijv. Google
-Foto's) in een notitie.
+Bovenaan het overzicht staat een langzaam wisselende foto/video-slideshow.
+Rechtsboven daarin zit een ✚-knopje om meteen foto's of korte video's toe te
+voegen (vanaf je telefoon of laptop, meerdere tegelijk). Tik op de slideshow
+zelf om de hele gallerij in een raster te zien; tik daarin op een foto of
+video om 'm groter te bekijken — daar zit een sluitknop (✕), vorige/volgende
+en een prullenbak om 'm te verwijderen. Sluiten brengt je steeds gewoon terug
+naar de vorige weergave. Video's zijn beperkt tot een korte clip van een paar
+seconden in lage kwaliteit (ca. 500 KB): de bestanden worden net als foto's
+rechtstreeks in Firestore bewaard, en daar geldt een limiet van 1 MB per
+document. Grotere of langere video's kun je desgewenst delen via een losse
+link (bijv. Google Foto's) in een notitie.
 
 ### Leveranciers & contacten
 Net als bij locaties kun je een contact toevoegen via een link: plak de
