@@ -2,7 +2,7 @@ import {
   signInWithPopup, getRedirectResult, signOut, onAuthStateChanged,
 } from "firebase/auth";
 import {
-  doc, getDoc, setDoc, collection, getDocs, addDoc, serverTimestamp, runTransaction,
+  doc, getDoc, setDoc, collection, getDocs, serverTimestamp, runTransaction,
 } from "firebase/firestore";
 import { auth, db, googleProvider } from "./firebase";
 
@@ -70,8 +70,8 @@ function randomCode(len = 7) {
   return s;
 }
 
-/** Maakt een nieuw, leeg (of gemigreerd) huwelijksproject aan voor `user` en
- * koppelt de gebruiker eraan als eigenaar + eerste lid. */
+/** Maakt een nieuw huwelijksproject aan voor `user` en koppelt de gebruiker
+ * eraan als eigenaar + eerste lid. */
 export async function createWedding(user, initialJson) {
   if (!db) throw new Error("Firebase is niet beschikbaar.");
   const weddingRef = doc(collection(db, "weddings"));
@@ -132,40 +132,4 @@ export async function listMembers(weddingId) {
   const out = [];
   snap.forEach((d) => out.push({ uid: d.id, ...d.data() }));
   return out;
-}
-
-/** Eenmalig alle foto's uit het oude gedeelde-code-document ophalen. */
-async function loadOldPhotos(oldCode) {
-  if (!db) return [];
-  const snap = await getDocs(collection(db, "planners", oldCode, "photos"));
-  const out = [];
-  snap.forEach((d) => {
-    const v = d.data();
-    if (v && v.dataUrl) out.push({ dataUrl: v.dataUrl, w: v.w || 0, h: v.h || 0 });
-  });
-  return out;
-}
-
-/**
- * Zet de gegevens van de oude gedeelde-code-app (planners/{oldCode}) over
- * naar een nieuw, aan Google-accounts gekoppeld project — inclusief foto's.
- * Geeft het nieuwe weddingId terug.
- */
-export async function migrateFromOldCode(user, oldCode) {
-  if (!db) throw new Error("Firebase is niet beschikbaar.");
-  const code = (oldCode || "").trim().toLowerCase();
-  if (!code) throw new Error("Vul de oude gedeelde code in.");
-  const oldSnap = await getDoc(doc(db, "planners", code));
-  if (!oldSnap.exists() || oldSnap.data().json == null) {
-    throw new Error("Geen bestaande gegevens gevonden onder die code.");
-  }
-  const json = oldSnap.data().json;
-  const weddingId = await createWedding(user, json);
-  const photos = await loadOldPhotos(code);
-  for (const p of photos) {
-    await addDoc(collection(db, "weddings", weddingId, "photos"), {
-      dataUrl: p.dataUrl, w: p.w, h: p.h, createdAt: serverTimestamp(),
-    });
-  }
-  return weddingId;
 }

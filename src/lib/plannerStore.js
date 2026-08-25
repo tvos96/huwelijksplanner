@@ -22,7 +22,7 @@ export const syncAvailable = !!db;
 
 /**
  * Generieke live-gedeelde-documentstore. `pathSegments` wijst naar één
- * Firestore-document (bv. ["weddings", weddingId] of ["planners", code]).
+ * Firestore-document (bv. ["weddings", weddingId]).
  * Alle plannergegevens staan als JSON-string in dat document; foto's staan
  * als losse documenten in de subcollectie "photos" eronder, zodat ze niet de
  * hele planner-listener zwaar maken.
@@ -124,12 +124,7 @@ function createDocStore(pathSegments) {
   return { load, save, subscribe, subscribePhotos, addPhoto, deletePhoto, loadPhotosOnce, ref };
 }
 
-/** Legacy: gedeelde planner op basis van een geheime code (vóór Google-login). */
-export function createPlannerStore(code) {
-  return createDocStore(["planners", code]);
-}
-
-/** Nieuw: planner gekoppeld aan een geauthenticeerd huwelijksproject. */
+/** Planner gekoppeld aan een geauthenticeerd huwelijksproject. */
 export function createWeddingStore(weddingId) {
   return createDocStore(["weddings", weddingId]);
 }

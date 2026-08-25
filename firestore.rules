@@ -8,12 +8,6 @@ rules_version = '2';
 // foto's lezen en bewerken. Nieuwe leden komen erbij via een tijdelijke,
 // eenmalige uitnodigingscode in invites/{code}.
 //
-// De oude collectie planners/{code} (uit de periode vóór Google-login) staat
-// hieronder alleen nog read-only voor ingelogde gebruikers, puur voor de
-// eenmalige migratie. Verwijder die documenten in de Firebase-console zodra
-// je gemigreerd bent, dan is ook dat laatste restje "iedereen met de code
-// kan erbij" weg.
-//
 // Publiceren: Firebase Console -> Firestore Database -> Rules -> plak dit
 // bestand -> Publish. Test het eerst gerust in het "Rules playground" tabblad
 // (zie de instructies in README.md).
@@ -67,16 +61,6 @@ service cloud.firestore {
         request.resource.data.used == true &&
         request.resource.data.weddingId == resource.data.weddingId;
       allow delete: if false;
-    }
-
-    // Alleen-lezen restant van de oude gedeelde-code-versie, voor de migratie.
-    match /planners/{code} {
-      allow read: if request.auth != null;
-      allow write: if false;
-      match /photos/{photoId} {
-        allow read: if request.auth != null;
-        allow write: if false;
-      }
     }
   }
 }

@@ -3,12 +3,11 @@ import { MONO } from "../data";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "./ui/card";
-import { createWedding, migrateFromOldCode, joinWeddingWithInviteCode, signOutUser } from "../lib/weddingAuth";
+import { createWedding, joinWeddingWithInviteCode, signOutUser } from "../lib/weddingAuth";
 import { defaultData } from "../App";
 
 export default function WeddingSetup({ user, onDone }) {
-  const [mode, setMode] = useState(null); // null | "new" | "migrate" | "join"
-  const [oldCode, setOldCode] = useState("");
+  const [mode, setMode] = useState(null); // null | "new" | "join"
   const [inviteCode, setInviteCode] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -19,14 +18,6 @@ export default function WeddingSetup({ user, onDone }) {
       const id = await createWedding(user, JSON.stringify(defaultData()));
       onDone(id);
     } catch (e) { setError(e.message || "Aanmaken is niet gelukt."); setBusy(false); }
-  }
-
-  async function doMigrate() {
-    setBusy(true); setError("");
-    try {
-      const id = await migrateFromOldCode(user, oldCode);
-      onDone(id);
-    } catch (e) { setError(e.message || "Overzetten is niet gelukt."); setBusy(false); }
   }
 
   async function doJoin() {
@@ -48,12 +39,6 @@ export default function WeddingSetup({ user, onDone }) {
 
         {mode === null && (
           <div className="mt-6 space-y-3">
-            <Card className="cursor-pointer hover:border-indigo" onClick={() => setMode("migrate")}>
-              <CardContent className="pt-4">
-                <div className="font-bold">Ik gebruikte de app al met een gedeelde code</div>
-                <p className="mt-1 text-sm text-muted">Zet jullie bestaande gasten, locaties, budget, taken en foto's over naar dit account — niets kwijt.</p>
-              </CardContent>
-            </Card>
             <Card className="cursor-pointer hover:border-indigo" onClick={() => setMode("join")}>
               <CardContent className="pt-4">
                 <div className="font-bold">Mijn partner heeft me uitgenodigd</div>
@@ -67,20 +52,6 @@ export default function WeddingSetup({ user, onDone }) {
               </CardContent>
             </Card>
           </div>
-        )}
-
-        {mode === "migrate" && (
-          <Card className="mt-6">
-            <CardHeader><CardTitle>Bestaande gegevens overzetten</CardTitle><CardDescription>Vul de gedeelde code in die jullie eerder gebruikten (bijv. "tim-ita-2027").</CardDescription></CardHeader>
-            <CardContent>
-              <Input placeholder="gedeelde code" value={oldCode} onChange={(e) => setOldCode(e.target.value)} autoCapitalize="none" />
-              {error && <p className="mt-2 text-sm text-rose-ink">{error}</p>}
-              <div className="mt-3 flex gap-2">
-                <Button disabled={busy || !oldCode.trim()} onClick={doMigrate}>{busy ? "Bezig…" : "Overzetten"}</Button>
-                <Button variant="ghost" onClick={() => { setMode(null); setError(""); }}>Terug</Button>
-              </div>
-            </CardContent>
-          </Card>
         )}
 
         {mode === "join" && (

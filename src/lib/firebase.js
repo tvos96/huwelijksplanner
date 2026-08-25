@@ -4,7 +4,7 @@ import { getAuth, GoogleAuthProvider } from "firebase/auth";
 
 // Zelfde Firebase-project als de vorige versie van de app (tim-en-ita-wedding-planner).
 // Dit is de publieke web-config van Firebase — niet geheim; de Firestore-rules
-// bepalen wie welke data mag lezen/schrijven (alleen wie de gedeelde code kent).
+// bepalen wie welke data mag lezen/schrijven (alleen ingelogde, uitgenodigde leden).
 const firebaseConfig = {
   apiKey: "AIzaSyDqOLX0R6rSZ8J7bI3InKtYXy8GWCmDnuA",
   authDomain: "tim-en-ita-wedding-planner.firebaseapp.com",
