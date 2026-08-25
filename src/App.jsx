@@ -1,33 +1,27 @@
-import React, { useState, useEffect, useRef } from "react";
-import { Heart, Users, MapPin, Wallet, CheckSquare, Star, X, Plus, ExternalLink, Check } from "lucide-react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
+import { createPortal } from "react-dom";
+import {
+  Heart, Users, MapPin, Wallet, CheckSquare, Star, X, Plus, ExternalLink, Check,
+  Contact, Cloud, Trash2, ChevronLeft, ChevronRight, Phone, Mail,
+} from "lucide-react";
 import { cn } from "./lib/utils";
 import { Button } from "./components/ui/button";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "./components/ui/card";
 import { Badge } from "./components/ui/badge";
 import { Input, Textarea } from "./components/ui/input";
 import { Progress } from "./components/ui/progress";
-import { MONO, COUPLE_COLOR, COUPLE_EMPTY, GUEST_SEED, VENUE_SEED, VENUE_COORDS, VENUE_ADDR } from "./data";
+import { MONO, COUPLE_COLOR, COUPLE_EMPTY, GUEST_SEED, VENUE_SEED, VENUE_COORDS, VENUE_ADDR, SEED_PHOTOS } from "./data";
+import { createPlannerStore, syncAvailable } from "./lib/plannerStore";
 
-/* ---------- opslag (werkt in Claude én als losse app) ---------- */
+/* ---------- opslag: live gedeeld via Firebase, met localStorage als terugval ---------- */
 const STORE_KEY = "wedding-planner-tim-ita-v2";
-const remoteStore = typeof window !== "undefined" && window.storage;
-async function loadData() {
-  try {
-    if (remoteStore) { const r = await window.storage.get(STORE_KEY); return r ? JSON.parse(r.value) : null; }
-    const raw = localStorage.getItem(STORE_KEY); return raw ? JSON.parse(raw) : null;
-  } catch { return null; }
-}
-async function saveData(d) {
-  try {
-    if (remoteStore) { await window.storage.set(STORE_KEY, JSON.stringify(d)); return; }
-    localStorage.setItem(STORE_KEY, JSON.stringify(d));
-  } catch (e) { console.error("Opslaan mislukt:", e); }
-}
 
 const uid = () => Math.random().toString(36).slice(2, 9);
 
 const defaultData = () => ({
   settings: { partnerA: "Tim", partnerB: "Ita", date: "", location: "" },
+  hiddenPhotos: [],
+  vendors: [],
   schedule: [
     { id: uid(), time: "13:30", label: "Aankomst gasten" },
     { id: uid(), time: "14:00", label: "Ceremonie" },
@@ -180,13 +174,57 @@ function IconBtn({ onClick, label, children, className }) {
 const FieldLabel = ({ children }) => <label className="mt-3 mb-1 block text-xs font-semibold text-indigo-ink">{children}</label>;
 
 /* ============================================================ */
-export default function WeddingPlanner() {
+export default function WeddingPlanner({ code }) {
+  const store = useMemo(() => (syncAvailable && code ? createPlannerStore(code) : null), [code]);
   const [data, setData] = useState(null);
   const [tab, setTab] = useState("overzicht");
   const [editSettings, setEditSettings] = useState(false);
   const ready = useRef(false);
-  useEffect(() => { (async () => { const s = await loadData(); setData(s || defaultData()); ready.current = true; })(); }, []);
-  useEffect(() => { if (ready.current && data) saveData(data); }, [data]);
+  const applyingRemote = useRef(false);
+
+  useEffect(() => {
+    let unsub = () => {};
+    let cancelled = false;
+    ready.current = false;
+    (async () => {
+      let initial = null;
+      let cached = null;
+      try { cached = localStorage.getItem(STORE_KEY); } catch { cached = null; }
+      if (store) {
+        try {
+          initial = await store.load();
+          if (initial) { try { localStorage.setItem(STORE_KEY, initial); } catch {} }
+        } catch (e) {
+          // Geen (tijdelijke) verbinding met de gedeelde lijst -> val terug op de
+          // laatst bekende lokale kopie i.p.v. de app te laten hangen op "laden…".
+          console.error("Kon gedeelde planner niet laden, val terug op lokale kopie:", e);
+          initial = cached;
+        }
+      } else {
+        initial = cached;
+      }
+      if (cancelled) return;
+      setData(initial ? JSON.parse(initial) : defaultData());
+      ready.current = true;
+      if (store) {
+        try {
+          unsub = store.subscribe((json) => {
+            applyingRemote.current = true;
+            setData(json ? JSON.parse(json) : defaultData());
+          });
+        } catch (e) { console.error("Live-sync kon niet starten:", e); }
+      }
+    })();
+    return () => { cancelled = true; unsub(); };
+  }, [store]);
+
+  useEffect(() => {
+    if (!ready.current || !data) return;
+    if (applyingRemote.current) { applyingRemote.current = false; return; }
+    const json = JSON.stringify(data);
+    try { localStorage.setItem(STORE_KEY, json); } catch (e) { console.error("Lokaal opslaan mislukt:", e); }
+    if (store) store.save(json).catch((e) => console.error("Opslaan in gedeelde lijst mislukt:", e));
+  }, [data]);
 
   if (!data) return (
     <div className="min-h-screen grid place-items-center">
@@ -196,10 +234,11 @@ export default function WeddingPlanner() {
 
   const set = (patch) => setData((d) => ({ ...d, ...patch }));
   const days = daysUntil(data.settings.date);
-  const tabs = [["overzicht", "Overzicht", Heart], ["gasten", "Gasten", Users], ["locaties", "Locaties", MapPin], ["budget", "Budget", Wallet], ["taken", "Taken", CheckSquare]];
+  const tabs = [["overzicht", "Overzicht", Heart], ["gasten", "Gasten", Users], ["locaties", "Locaties", MapPin], ["budget", "Budget", Wallet], ["taken", "Taken", CheckSquare], ["contacten", "Contacten", Contact]];
 
   return (
     <div className="min-h-screen bg-canvas pb-28">
+      <BackupWidget data={data} setData={setData} />
       <div className="mx-auto max-w-[780px] px-4 pt-7">
         <header className="text-center pb-5">
           <img src={MONO} className="h-16 mx-auto" alt="Monogram Tim en Ita" />
@@ -207,6 +246,7 @@ export default function WeddingPlanner() {
           <h1 className="mt-1 text-4xl sm:text-5xl font-extrabold tracking-tight">
             {data.settings.partnerA} <span className="text-rose italic">&amp;</span> {data.settings.partnerB}
           </h1>
+          {tab === "overzicht" && <PhotoFeature data={data} setData={setData} store={store} />}
           <div className="mt-1 text-muted">{longDate(data.settings.date) || "Datum nog te prikken"}{data.settings.location ? " · " + data.settings.location : ""}</div>
           {days !== null && (
             <div className="mt-4 inline-flex items-baseline gap-2 rounded-full bg-rose-soft px-6 py-3">
@@ -221,6 +261,7 @@ export default function WeddingPlanner() {
         {tab === "locaties" && <Venues data={data} setData={setData} />}
         {tab === "budget" && <Budget data={data} setData={setData} />}
         {tab === "taken" && <Tasks data={data} setData={setData} />}
+        {tab === "contacten" && <Vendors data={data} setData={setData} />}
 
         <div className="mt-8 text-center text-xs text-muted">
           Gemaakt met liefde · <button className="underline" onClick={() => { if (confirm("Alle gegevens wissen en opnieuw beginnen?")) setData(defaultData()); }}>opnieuw beginnen</button>
@@ -577,6 +618,273 @@ function Tasks({ data, setData }) {
           <div className="pt-2"><Button variant="outline" size="sm" onClick={add}><Plus size={16} /> Taak toevoegen</Button></div>
         </CardContent>
       </Card>
+    </div>
+  );
+}
+
+/* ---------------- Contacten (leveranciers) ---------------- */
+function Vendors({ data, setData }) {
+  const list = data.vendors || [];
+  const ROLES = ["Fotograaf", "Cateraar", "Muziek / DJ", "Bloemist", "Trouwambtenaar", "Taart", "Vervoer", "Decoratie"];
+  const upd = (id, f, val) => setData((d) => ({ ...d, vendors: (d.vendors || []).map((x) => x.id === id ? { ...x, [f]: val } : x) }));
+  const add = (role) => setData((d) => ({ ...d, vendors: [...(d.vendors || []), { id: uid(), name: "", role: role || "", phone: "", email: "", price: "", status: "", note: "" }] }));
+  const del = (id) => setData((d) => ({ ...d, vendors: (d.vendors || []).filter((x) => x.id !== id) }));
+  const booked = list.filter((x) => x.status === "geboekt").length;
+
+  return (
+    <div className="space-y-4">
+      <Card>
+        <CardHeader><CardTitle>Leveranciers &amp; contacten</CardTitle>
+          <CardDescription>{list.length} {list.length === 1 ? "contact" : "contacten"} · {booked} geboekt</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <FieldLabel>Snel toevoegen</FieldLabel>
+          <div className="mt-1 flex flex-wrap gap-2">
+            {ROLES.map((r) => <button key={r} onClick={() => add(r)} className="rounded-full border border-line px-3 py-1.5 text-xs font-semibold text-muted hover:border-indigo hover:text-indigo-ink">+ {r}</button>)}
+          </div>
+        </CardContent>
+      </Card>
+
+      {list.length === 0 && (
+        <Card><CardContent className="pt-4"><p className="text-sm text-muted">Nog geen contacten. Tik hierboven op een rol om er snel een toe te voegen.</p></CardContent></Card>
+      )}
+
+      {list.map((x) => (
+        <Card key={x.id}>
+          <CardContent className="pt-4">
+            <div className="flex items-start gap-2">
+              <div className="min-w-0 flex-1">
+                <input className="w-full bg-transparent text-lg font-bold focus:outline-none" placeholder="Naam / bedrijf" value={x.name || ""} onChange={(e) => upd(x.id, "name", e.target.value)} />
+                <input className="w-full bg-transparent text-xs text-muted focus:outline-none" placeholder="Rol (bv. Fotograaf)" value={x.role || ""} onChange={(e) => upd(x.id, "role", e.target.value)} />
+              </div>
+              <IconBtn label="Verwijderen" onClick={() => del(x.id)}><X size={18} /></IconBtn>
+            </div>
+            <div className="mt-2 flex flex-wrap gap-2">
+              <Pill tone="amber" active={x.status === "optie"} onClick={() => upd(x.id, "status", x.status === "optie" ? "" : "optie")}>Optie</Pill>
+              <Pill tone="teal" active={x.status === "geboekt"} onClick={() => upd(x.id, "status", x.status === "geboekt" ? "" : "geboekt")}>Geboekt</Pill>
+            </div>
+            <div className="mt-2 grid grid-cols-2 gap-2">
+              <div><FieldLabel>Telefoon</FieldLabel><Input type="tel" placeholder="06-..." value={x.phone || ""} onChange={(e) => upd(x.id, "phone", e.target.value)} /></div>
+              <div><FieldLabel>Prijs</FieldLabel><Input placeholder="bv. € 2.500" value={x.price || ""} onChange={(e) => upd(x.id, "price", e.target.value)} /></div>
+            </div>
+            <FieldLabel>E-mail</FieldLabel>
+            <Input type="email" placeholder="naam@bedrijf.nl" value={x.email || ""} onChange={(e) => upd(x.id, "email", e.target.value)} />
+            <FieldLabel>Notitie</FieldLabel>
+            <Textarea placeholder="Afspraken, offertelink, etc." value={x.note || ""} onChange={(e) => upd(x.id, "note", e.target.value)} />
+            <div className="mt-3 flex flex-wrap gap-4">
+              {x.phone && <a className="inline-flex items-center gap-1 text-sm text-indigo-ink underline" href={"tel:" + (x.phone || "").replace(/\s/g, "")}><Phone size={14} /> Bellen</a>}
+              {x.email && <a className="inline-flex items-center gap-1 text-sm text-indigo-ink underline" href={"mailto:" + x.email}><Mail size={14} /> Mailen</a>}
+            </div>
+          </CardContent>
+        </Card>
+      ))}
+
+      <Button variant="outline" size="sm" onClick={() => add("")}><Plus size={16} /> Leverancier toevoegen</Button>
+    </div>
+  );
+}
+
+/* ---------------- Aanzoek-foto's: slideshow + galerij ---------------- */
+function compressImage(file) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      let w = img.naturalWidth, h = img.naturalHeight;
+      const MAX = 1400, s = Math.min(1, MAX / Math.max(w, h));
+      let cw = Math.max(1, Math.round(w * s)), ch = Math.max(1, Math.round(h * s));
+      const canvas = document.createElement("canvas");
+      const ctx = canvas.getContext("2d");
+      function render() { canvas.width = cw; canvas.height = ch; ctx.drawImage(img, 0, 0, cw, ch); }
+      render();
+      let q = 0.8, dataUrl = canvas.toDataURL("image/jpeg", q);
+      while (dataUrl.length > 680 * 1024 && q > 0.42) { q -= 0.1; dataUrl = canvas.toDataURL("image/jpeg", q); }
+      while (dataUrl.length > 680 * 1024 && cw > 700) { cw = Math.round(cw * 0.85); ch = Math.round(ch * 0.85); render(); dataUrl = canvas.toDataURL("image/jpeg", 0.62); }
+      resolve({ dataUrl, w: cw, h: ch });
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error("Kon de afbeelding niet lezen")); };
+    img.src = url;
+  });
+}
+
+function useAddedPhotos(store) {
+  const [added, setAdded] = useState([]);
+  useEffect(() => {
+    if (!store) { setAdded([]); return; }
+    const unsub = store.subscribePhotos(setAdded);
+    return () => unsub();
+  }, [store]);
+  return added;
+}
+
+function PhotoFeature({ data, setData, store }) {
+  const added = useAddedPhotos(store);
+  const hidden = data.hiddenPhotos || [];
+  const seeds = SEED_PHOTOS.filter((p) => !hidden.includes(p.src)).map((p) => ({ ...p, seed: true }));
+  const photos = seeds.concat(added);
+
+  const [galleryOpen, setGalleryOpen] = useState(false);
+  const [viewer, setViewer] = useState(-1);
+  const [idx, setIdx] = useState(0);
+  const [busy, setBusy] = useState(false);
+  const fileRef = useRef(null);
+  const touchX = useRef(null);
+
+  const n = photos.length;
+  const cur = n ? Math.min(idx, n - 1) : 0;
+
+  useEffect(() => {
+    if (n < 2) return;
+    const t = setInterval(() => setIdx((i) => (i + 1) % n), 4000);
+    return () => clearInterval(t);
+  }, [n]);
+
+  async function onPick(e) {
+    const files = Array.from(e.target.files || []);
+    e.target.value = "";
+    if (!files.length) return;
+    if (!store) { alert("Foto's toevoegen werkt alleen zodra live-sync actief is."); return; }
+    setBusy(true);
+    for (const file of files) {
+      try { const r = await compressImage(file); await store.addPhoto(r.dataUrl, r.w, r.h); }
+      catch (err) { console.error(err); }
+    }
+    setBusy(false);
+  }
+
+  function removeAt(i) {
+    const p = photos[i];
+    if (!p) return;
+    if (p.seed) setData({ ...data, hiddenPhotos: hidden.concat([p.src]) });
+    else if (store) store.deletePhoto(p.id);
+    const remaining = n - 1;
+    if (remaining <= 0) setViewer(-1);
+    else setViewer((v) => Math.min(v, remaining - 1));
+  }
+
+  function openFiles() { if (fileRef.current) fileRef.current.click(); }
+
+  if (n === 0) {
+    return (
+      <div className="mx-auto mt-3 max-w-[430px]">
+        <input ref={fileRef} type="file" accept="image/*" multiple className="hidden" onChange={onPick} />
+        <button onClick={openFiles}
+          className="flex w-full items-center justify-center rounded-2xl border border-dashed border-line bg-rose-soft font-bold text-rose-ink"
+          style={{ aspectRatio: "16/10" }}>
+          ＋ Voeg jullie aanzoeksfoto's toe
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="mx-auto mt-3 max-w-[430px]">
+      <input ref={fileRef} type="file" accept="image/*" multiple className="hidden" onChange={onPick} />
+
+      <button onClick={() => setGalleryOpen(true)} aria-label="Bekijk foto's"
+        className="relative block w-full overflow-hidden rounded-2xl border border-line bg-rose-soft shadow-soft"
+        style={{ aspectRatio: "16/10" }}>
+        {photos.map((p, i) => (
+          <img key={p.id || p.src} src={p.src} alt="" loading={i === 0 ? undefined : "lazy"}
+            className={cn("absolute inset-0 h-full w-full object-cover transition-opacity duration-1000", i === cur ? "opacity-100" : "opacity-0")} />
+        ))}
+        <span className="absolute bottom-2.5 left-3 rounded-full bg-black/30 px-3 py-1 text-[13.5px] font-bold text-white backdrop-blur-sm">Het aanzoek 💍</span>
+        <span className="absolute bottom-3 right-2.5 flex gap-1.5">
+          {photos.map((p, i) => <i key={i} className={cn("h-1.5 w-1.5 rounded-full", i === cur ? "bg-white" : "bg-white/55")} />)}
+        </span>
+      </button>
+
+      {galleryOpen && createPortal((
+        <div className="fixed inset-0 z-[1000] flex flex-col bg-canvas" onClick={(e) => { if (e.target === e.currentTarget) setGalleryOpen(false); }}
+          style={{ paddingTop: "env(safe-area-inset-top)", paddingBottom: "env(safe-area-inset-bottom)" }}>
+          <div className="flex items-center justify-between border-b border-line px-4 py-3.5 font-bold text-ink">
+            <span>Onze foto's · {n}</span>
+            <button onClick={() => setGalleryOpen(false)} aria-label="Sluiten" className="p-1 text-muted hover:text-ink"><X size={21} /></button>
+          </div>
+          <div className="grid flex-1 grid-cols-3 content-start gap-1 overflow-y-auto p-1 pb-6">
+            {photos.map((p, i) => (
+              <button key={p.id || p.src} onClick={() => setViewer(i)} className="relative overflow-hidden rounded-md bg-line p-0" style={{ aspectRatio: "1" }}>
+                <img src={p.src} alt="" loading="lazy" className="h-full w-full object-cover" />
+              </button>
+            ))}
+            <button onClick={openFiles} disabled={busy}
+              className="flex flex-col items-center justify-center gap-1 rounded-md bg-rose-soft text-rose-ink" style={{ aspectRatio: "1" }}>
+              <span className="text-2xl font-bold leading-none">{busy ? "…" : "＋"}</span>
+              <small className="px-1 text-center text-[10.5px] font-semibold">{busy ? "uploaden" : "Voeg foto's toe"}</small>
+            </button>
+          </div>
+        </div>
+      ), document.body)}
+
+      {viewer >= 0 && photos[viewer] && createPortal((
+        <div className="fixed inset-0 z-[1100] flex flex-col bg-black/95" onClick={(e) => { if (e.target === e.currentTarget) setViewer(-1); }}
+          style={{ paddingTop: "env(safe-area-inset-top)", paddingBottom: "env(safe-area-inset-bottom)" }}>
+          <div className="flex items-center justify-between px-3.5 py-3 text-white">
+            <span className="text-sm font-semibold opacity-90">{viewer + 1} / {n}</span>
+            <div className="flex gap-2">
+              <button className="rounded-full bg-white/10 p-2.5 hover:bg-white/20" onClick={() => { if (confirm("Deze foto verwijderen?")) removeAt(viewer); }} aria-label="Verwijderen"><Trash2 size={18} /></button>
+              <button className="rounded-full bg-white/10 p-2.5 hover:bg-white/20" onClick={() => setViewer(-1)} aria-label="Sluiten"><X size={18} /></button>
+            </div>
+          </div>
+          <div className="relative flex flex-1 items-center justify-center overflow-hidden"
+            onClick={(e) => { if (e.target === e.currentTarget) setViewer(-1); }}
+            onTouchStart={(e) => { touchX.current = e.touches[0].clientX; }}
+            onTouchEnd={(e) => { if (touchX.current == null) return; const dx = e.changedTouches[0].clientX - touchX.current; touchX.current = null; if (Math.abs(dx) > 40 && n > 1) setViewer((v) => dx < 0 ? (v + 1) % n : (v - 1 + n) % n); }}>
+            {n > 1 && <button className="absolute left-2.5 top-1/2 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-white/15 text-white" onClick={() => setViewer((v) => (v - 1 + n) % n)} aria-label="Vorige"><ChevronLeft size={26} /></button>}
+            <img src={photos[viewer].src} alt="" className="max-h-full max-w-full select-none object-contain" />
+            {n > 1 && <button className="absolute right-2.5 top-1/2 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-white/15 text-white" onClick={() => setViewer((v) => (v + 1) % n)} aria-label="Volgende"><ChevronRight size={26} /></button>}
+          </div>
+        </div>
+      ), document.body)}
+    </div>
+  );
+}
+
+/* ---------------- Back-up & herstel ---------------- */
+function BackupWidget({ data, setData }) {
+  const [open, setOpen] = useState(false);
+  const fileRef = useRef(null);
+
+  function download() {
+    const json = JSON.stringify(data);
+    const d = new Date(), pad = (x) => String(x).padStart(2, "0");
+    const name = "huwelijksplanner-backup-" + d.getFullYear() + pad(d.getMonth() + 1) + pad(d.getDate()) + ".json";
+    const blob = new Blob([json], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a"); a.href = url; a.download = name;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
+  }
+
+  function onPick(e) {
+    const file = e.target.files && e.target.files[0];
+    e.target.value = "";
+    if (!file) return;
+    const r = new FileReader();
+    r.onload = () => {
+      try {
+        const obj = JSON.parse(String(r.result));
+        if (!obj || typeof obj !== "object" || !obj.guests || !obj.settings) { alert("Dit lijkt geen geldige back-up van de planner."); return; }
+        if (!confirm("Hiermee vervang je de huidige lijst (ook bij je partner) door deze back-up. Doorgaan?")) return;
+        setData(obj);
+      } catch (err) { alert("Kon de back-up niet lezen: " + err.message); }
+    };
+    r.readAsText(file);
+  }
+
+  return (
+    <div className="fixed right-3 z-[800]" style={{ top: "calc(8px + env(safe-area-inset-top))" }}>
+      <input ref={fileRef} type="file" accept="application/json,.json" className="hidden" onChange={onPick} />
+      {open && (
+        <div className="absolute right-0 top-12 min-w-[212px] overflow-hidden rounded-xl2 border border-line bg-white shadow-soft">
+          <button className="block w-full border-b border-line/70 px-4 py-3 text-left text-sm font-semibold text-ink hover:bg-canvas" onClick={() => { setOpen(false); download(); }}>⬇︎ Back-up downloaden</button>
+          <button className="block w-full px-4 py-3 text-left text-sm font-semibold text-ink hover:bg-canvas" onClick={() => { setOpen(false); fileRef.current && fileRef.current.click(); }}>⬆︎ Back-up terugzetten</button>
+        </div>
+      )}
+      <button onClick={() => setOpen((o) => !o)} title="Back-up & herstel"
+        className="flex h-10 w-10 items-center justify-center rounded-full border border-line bg-white text-rose shadow-soft opacity-85 hover:opacity-100">
+        <Cloud size={18} />
+      </button>
     </div>
   );
 }

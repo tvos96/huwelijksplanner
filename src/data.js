@@ -40,3 +40,20 @@ export const VENUE_ADDR = {
   "Tuin de Lage Oorsprong": "Van Borsselenweg 36, 6862 BJ Oosterbeek, Nederland",
   "Hoeve Landzicht": "Oukoop 22, 3626 AW Nieuwer Ter Aa, Nederland",
 };
+
+// Aanzoeksfoto's (slideshow op het overzicht) — bestanden in public/photos
+export const SEED_PHOTOS = [
+  { src: "/photos/aanzoek-01.jpg", w: 788, h: 1400 },
+  { src: "/photos/aanzoek-02.jpg", w: 1400, h: 788 },
+  { src: "/photos/aanzoek-03.jpg", w: 788, h: 1400 },
+  { src: "/photos/aanzoek-04.jpg", w: 788, h: 1400 },
+  { src: "/photos/aanzoek-05.jpg", w: 788, h: 1400 },
+  { src: "/photos/aanzoek-06.jpg", w: 788, h: 1400 },
+  { src: "/photos/aanzoek-07.jpg", w: 788, h: 1400 },
+  { src: "/photos/aanzoek-08.jpg", w: 788, h: 1400 },
+  { src: "/photos/aanzoek-09.jpg", w: 788, h: 1400 },
+  { src: "/photos/aanzoek-10.jpg", w: 788, h: 1400 },
+  { src: "/photos/aanzoek-11.jpg", w: 788, h: 1400 },
+  { src: "/photos/aanzoek-12.jpg", w: 1400, h: 788 },
+  { src: "/photos/aanzoek-13.jpg", w: 1400, h: 788 },
+];
