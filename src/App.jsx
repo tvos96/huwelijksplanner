@@ -229,7 +229,7 @@ export default function WeddingPlanner({ weddingId }) {
 
   if (!data) return (
     <div className="min-h-screen grid place-items-center">
-      <div className="text-center"><img src={MONO} className="h-20 mx-auto opacity-90" alt="monogram" /><p className="mt-3 text-sm text-muted">Even jullie plannen ophalen…</p></div>
+      <div className="text-center"><img src={MONO} className="h-20 mx-auto opacity-90" alt="logo" /><p className="mt-3 text-sm text-muted">Even jullie plannen ophalen…</p></div>
     </div>
   );
 
@@ -242,7 +242,7 @@ export default function WeddingPlanner({ weddingId }) {
       <BackupWidget data={data} setData={setData} />
       <div className="mx-auto max-w-[780px] px-4 pt-7">
         <header className="text-center pb-5">
-          <img src={MONO} className="h-16 mx-auto" alt="Monogram Tim en Ita" />
+          <img src={MONO} className="h-16 mx-auto" alt="Logo Huwelijksplanner" />
           <div className="mt-2 text-[11px] font-semibold uppercase tracking-[0.22em] text-rose">Wij gaan trouwen</div>
           <h1 className="mt-1 text-4xl sm:text-5xl font-extrabold tracking-tight">
             {data.settings.partnerA} <span className="text-rose italic">&amp;</span> {data.settings.partnerB}

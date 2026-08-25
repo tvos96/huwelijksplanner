@@ -58,7 +58,7 @@ opnieuw `netlify deploy --build --prod`.
 
 ## 5. Op je iPhone zetten
 Open de Netlify-URL in Safari → deelknop → "Zet op beginscherm".
-Je krijgt het T+I-monogram als icoon en de app opent schermvullend.
+Je krijgt het trouwringen-icoon en de app opent schermvullend.
 
 ## Inloggen, uitnodigen & wie er bij mag
 Bij de eerste keer openen log je in met **Google** via een pop-up-venster (zorg
