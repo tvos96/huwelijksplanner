@@ -737,8 +737,8 @@ function Vendors({ data, setData }) {
           <CardContent className="pt-4">
             <div className="flex items-start gap-2">
               <div className="min-w-0 flex-1">
-                <input className="w-full bg-transparent text-lg font-bold focus:outline-none" placeholder="Naam / bedrijf" value={x.name || ""} onChange={(e) => upd(x.id, "name", e.target.value)} />
-                <input className="w-full bg-transparent text-xs text-muted focus:outline-none" placeholder="Rol (bv. Fotograaf)" value={x.role || ""} onChange={(e) => upd(x.id, "role", e.target.value)} />
+                <input className="w-full bg-transparent text-lg font-bold placeholder:text-muted/70 focus:outline-none" placeholder="Naam / bedrijf" value={x.name || ""} onChange={(e) => upd(x.id, "name", e.target.value)} />
+                <input className="w-full bg-transparent text-xs text-muted placeholder:text-muted/70 focus:outline-none" placeholder="Rol (bv. Fotograaf)" value={x.role || ""} onChange={(e) => upd(x.id, "role", e.target.value)} />
               </div>
               <IconBtn label="Verwijderen" onClick={() => { if (confirm("Dit contact verwijderen?")) del(x.id); }}><X size={18} /></IconBtn>
             </div>

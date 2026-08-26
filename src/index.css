@@ -5,4 +5,14 @@
 @layer base {
   html, body, #root { height: 100%; }
   body { @apply bg-canvas text-ink font-sans antialiased; margin: 0; }
+  /* Zonder deze regel gebruiken links (bijv. in de locatiekaart-popups) de
+     standaard blauwe/paarse browserkleur i.p.v. het eigen kleurenschema. */
+  a { @apply text-indigo-ink underline-offset-2; }
+  a:visited { @apply text-indigo-ink; }
 }
+
+/* Leaflet (locatiekaart) laadt zijn eigen basis-CSS vanaf een CDN; deze
+   regels trekken de bediening in het kleurenschema (geen standaard-blauw). */
+.leaflet-popup-content a { @apply text-indigo-ink font-semibold; }
+.leaflet-bar a { color: theme("colors.ink") !important; }
+.leaflet-bar a:hover { color: theme("colors.indigo.ink") !important; }
