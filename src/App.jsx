@@ -922,23 +922,28 @@ function PhotoFeature({ data, setData, store }) {
           </div>
           <div className="grid flex-1 grid-cols-3 content-start gap-1 overflow-y-auto p-1 pb-6">
             {photos.map((p, i) => (
-              <button key={p.id} onClick={() => setViewer(i)} className="relative overflow-hidden rounded-md bg-line p-0" style={{ aspectRatio: "1" }}>
-                {p.type === "video" ? (
-                  <video src={p.src} muted playsInline preload="metadata" className="h-full w-full object-cover" />
-                ) : (
-                  <img src={p.src} alt="" loading="lazy" className="h-full w-full object-cover" />
-                )}
-                {p.type === "video" && (
-                  <span className="absolute inset-0 flex items-center justify-center bg-black/15">
-                    <span className="flex h-6 w-6 items-center justify-center rounded-full bg-white/85"><Play size={12} fill="#221E2E" /></span>
-                  </span>
-                )}
+              <button key={p.id} onClick={() => setViewer(i)} className="relative overflow-hidden rounded-md bg-line p-0">
+                <div style={{ paddingTop: "100%" }} />
+                <div className="absolute inset-0">
+                  {p.type === "video" ? (
+                    <video src={p.src} muted playsInline preload="metadata" className="h-full w-full object-cover" />
+                  ) : (
+                    <img src={p.src} alt="" loading="lazy" className="h-full w-full object-cover" />
+                  )}
+                  {p.type === "video" && (
+                    <span className="absolute inset-0 flex items-center justify-center bg-black/15">
+                      <span className="flex h-6 w-6 items-center justify-center rounded-full bg-white/85"><Play size={12} fill="#221E2E" /></span>
+                    </span>
+                  )}
+                </div>
               </button>
             ))}
-            <button onClick={openFiles} disabled={busy}
-              className="flex flex-col items-center justify-center gap-1 rounded-md bg-rose-soft text-rose-ink" style={{ aspectRatio: "1" }}>
-              <span className="text-2xl font-bold leading-none">{busy ? "…" : "＋"}</span>
-              <small className="px-1 text-center text-[10.5px] font-semibold">{busy ? "uploaden" : "Voeg toe"}</small>
+            <button onClick={openFiles} disabled={busy} className="relative rounded-md bg-rose-soft text-rose-ink">
+              <div style={{ paddingTop: "100%" }} />
+              <div className="absolute inset-0 flex flex-col items-center justify-center gap-1">
+                <span className="text-2xl font-bold leading-none">{busy ? "…" : "＋"}</span>
+                <small className="px-1 text-center text-[10.5px] font-semibold">{busy ? "uploaden" : "Voeg toe"}</small>
+              </div>
             </button>
           </div>
         </div>
