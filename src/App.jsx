@@ -920,9 +920,10 @@ function PhotoFeature({ data, setData, store }) {
             <span>Onze foto's &amp; video's · {n}</span>
             <button onClick={() => setGalleryOpen(false)} aria-label="Sluiten" className="p-1 text-muted hover:text-ink"><X size={21} /></button>
           </div>
-          <div className="grid flex-1 grid-cols-3 content-start gap-1 overflow-y-auto p-1 pb-6">
+          <div className="grid flex-1 content-start justify-center gap-1.5 overflow-y-auto p-2 pb-6"
+            style={{ gridTemplateColumns: "repeat(auto-fill, minmax(96px, 1fr))" }}>
             {photos.map((p, i) => (
-              <button key={p.id} onClick={() => setViewer(i)} className="relative overflow-hidden rounded-md bg-line p-0">
+              <button key={p.id} onClick={() => setViewer(i)} className="relative mx-auto w-full max-w-[128px] overflow-hidden rounded-md bg-line p-0">
                 <div style={{ paddingTop: "100%" }} />
                 <div className="absolute inset-0">
                   {p.type === "video" ? (
@@ -938,7 +939,7 @@ function PhotoFeature({ data, setData, store }) {
                 </div>
               </button>
             ))}
-            <button onClick={openFiles} disabled={busy} className="relative rounded-md bg-rose-soft text-rose-ink">
+            <button onClick={openFiles} disabled={busy} className="relative mx-auto w-full max-w-[128px] rounded-md bg-rose-soft text-rose-ink">
               <div style={{ paddingTop: "100%" }} />
               <div className="absolute inset-0 flex flex-col items-center justify-center gap-1">
                 <span className="text-2xl font-bold leading-none">{busy ? "…" : "＋"}</span>
