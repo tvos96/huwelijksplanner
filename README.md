@@ -122,16 +122,43 @@ te verwijderen. Zodra er contacten met een rol zijn, verschijnt een filterbalk
 waarmee je bijvoorbeeld in één tik al je fotografen kunt bekijken.
 
 ### Back-up & Excel
-Rechtsboven zit een ☁-knopje met vier opties:
+Rechtsboven zit een ☁-knopje met de volgende opties:
 - **Back-up downloaden/terugzetten** — alle gegevens als `.json`-bestand.
 - **Exporteren naar Excel** — een `.xlsx` met vijf tabbladen: **Gasten**,
-  **Locaties**, **Budget**, **Taken**, **Contacten**. Handig om in bulk te
-  bewerken (bijv. de hele gastenlijst in Excel bijwerken).
+  **Locaties**, **Budget**, **Taken**, **Contacten**, opgemaakt in het
+  kleurenschema van de app (gekleurde kopregel, zebra-rijen, bevroren
+  kopregel). Handig om in bulk te bewerken (bijv. de hele gastenlijst in
+  Excel bijwerken).
 - **Importeren vanuit Excel** — leest zo'n bestand weer in. Tabbladen die
   ontbreken worden overgeslagen; wat er wél in staat vervangt dat onderdeel
   volledig (na een bevestiging). De kolomkoppen moeten overeenkomen met het
   geëxporteerde formaat — begin dus bij het exporteren van je huidige data en
   bewerk dat bestand verder.
+- **Koppel met live Google Sheet** — maakt één keer een Google Sheet aan op
+  Drive (zelfde vijf tabbladen, met kleur) en werkt die daarna automatisch
+  bij zodra er iets verandert in de app — zolang er ergens een browsertab
+  open staat die gekoppeld is. De sheet wordt automatisch gedeeld met beide
+  partners (kan bewerken). Elke sessie/tab moet zelf eenmaal op **"Verbind
+  deze sessie"** klikken om zelf ook te mogen bijwerken — dat hoeft maar
+  eens per browser, niet elke keer dat je de app opent (het token blijft
+  ongeveer een uur geldig; daarna vraagt de app vanzelf weer om opnieuw te
+  koppelen). Dit is een bewust *aparte* toestemmingsstap los van het gewone
+  inloggen: alleen wie hierop klikt geeft de app rechten tot Google
+  Drive, en dan alleen tot bestanden die de app zélf aanmaakt (niet de rest
+  van je Drive). Zie ook "Google Sheets-koppeling" hieronder voor een
+  eenmalige instelling die dit mogelijk maakt.
+
+### Google Sheets-koppeling (eenmalige instelling, alleen als je dit gebruikt)
+Voor **"Koppel met live Google Sheet"** vraagt de app naast e-mail/naam ook
+toegang tot Google Drive/Sheets — een "gevoelig" OAuth-scope. Omdat dit
+project waarschijnlijk niet door Google geverifieerd is (dat is alleen nodig
+voor apps met veel gebruikers), kan Google bij het koppelen een
+"Google heeft deze app niet geverifieerd"-scherm tonen. Voor eigen gebruik is
+dat geen probleem — klik op "Geavanceerd" → "Doorgaan naar (project)". Zorg
+wel dat jullie beide Google-accounts als **testgebruiker** zijn toegevoegd in
+de Google Cloud Console van het Firebase-project
+(**APIs & Services → OAuth consent screen → Test users**), anders weigert
+Google de toestemming helemaal. Dit hoef je maar één keer in te stellen.
 
 ## Structuur
 - `src/App.jsx` — de planner zelf (schermen, tabs, foto/video-gallerij, back-up, Excel)
@@ -140,9 +167,10 @@ Rechtsboven zit een ☁-knopje met vier opties:
 - `src/components/WeddingSetup.jsx` — nieuw project starten (met namen) / aansluiten met uitnodigingscode
 - `src/components/InviteWidget.jsx` — wie heeft toegang + partner uitnodigen
 - `src/lib/firebase.js` — Firebase-config en -initialisatie (auth + Firestore)
-- `src/lib/weddingAuth.js` — inloggen, project aanmaken/uitnodigen
-- `src/lib/plannerStore.js` — live opslag/sync van planner-data, foto's en video's
-- `src/lib/excel.js` — Excel-export/import (vijf tabbladen)
+- `src/lib/weddingAuth.js` — inloggen, project aanmaken/uitnodigen, Google Sheets-koppeling (toegangstoken)
+- `src/lib/plannerStore.js` — live opslag/sync van planner-data, foto's, video's en de sheet-koppeling
+- `src/lib/excel.js` — Excel-export/import (vijf tabbladen, met opmaak)
+- `src/lib/sheetsSync.js` — live Google Sheet aanmaken/delen/bijwerken via de Sheets- en Drive-API
 - `src/data.js` — logo, kaart-hulpdata (venue-coördinaten/adressen); bevat geen
   persoonlijke gegevens meer — elk nieuw project start leeg
 - `public/` — app-iconen en manifest

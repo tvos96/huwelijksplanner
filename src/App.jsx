@@ -13,6 +13,8 @@ import { Progress } from "./components/ui/progress";
 import { MONO, COUPLE_COLOR, COUPLE_EMPTY, VENUE_COORDS, VENUE_ADDR } from "./data";
 import { createWeddingStore, syncAvailable } from "./lib/plannerStore";
 import { exportExcel, importExcel } from "./lib/excel";
+import { listMembers, connectGoogleSheets, getGoogleAccessToken, onGoogleAccessTokenChange, authErrorMessage } from "./lib/weddingAuth";
+import { createLiveSheet, shareLiveSheet, pushToLiveSheet } from "./lib/sheetsSync";
 
 /* ---------- opslag: live gedeeld via Firebase, met localStorage als terugval ---------- */
 const STORE_KEY = "wedding-planner-tim-ita-v2";
@@ -227,6 +229,61 @@ export default function WeddingPlanner({ weddingId }) {
     if (store) store.save(json).catch((e) => console.error("Opslaan in gedeelde lijst mislukt:", e));
   }, [data]);
 
+  // ---- Live Google Sheet-koppeling (optioneel) --------------------------
+  const [sheetLink, setSheetLink] = useState(null); // { sheetId, sheetUrl } | null
+  const [sheetToken, setSheetToken] = useState(() => getGoogleAccessToken());
+  const [sheetBusy, setSheetBusy] = useState(false);
+  const [sheetError, setSheetError] = useState("");
+  const sheetPushTimer = useRef(null);
+
+  useEffect(() => {
+    if (!store) return;
+    return store.subscribeSheetLink(setSheetLink);
+  }, [store]);
+
+  useEffect(() => onGoogleAccessTokenChange(setSheetToken), []);
+
+  useEffect(() => {
+    if (!ready.current || !data || !store || !sheetLink || !sheetLink.sheetId || !sheetToken) return;
+    // Ongeacht of deze wijziging lokaal of van de ander kwam: gewoon (opnieuw)
+    // naar de sheet pushen. Dat is idempotent (zelfde data nog eens
+    // wegschrijven kan geen kwaad) en voorkomt dat de sheet stiekem achterloopt.
+    clearTimeout(sheetPushTimer.current);
+    sheetPushTimer.current = setTimeout(() => {
+      pushToLiveSheet(sheetToken, sheetLink.sheetId, data).catch((e) => {
+        console.error("Bijwerken van live Google Sheet mislukt:", e);
+        if (e.status === 401 || e.status === 403) setSheetToken(null); // token verlopen -> opnieuw koppelen nodig
+      });
+    }, 1500);
+    return () => clearTimeout(sheetPushTimer.current);
+  }, [data, sheetLink, sheetToken, store]);
+
+  async function connectSheet() {
+    setSheetBusy(true); setSheetError("");
+    try {
+      const token = await connectGoogleSheets();
+      if (sheetLink && sheetLink.sheetId) {
+        await pushToLiveSheet(token, sheetLink.sheetId, data); // deze sessie meteen op de nieuwste stand zetten
+      } else {
+        const title = "Huwelijksplanner — " + (data.settings.partnerA || "?") + " & " + (data.settings.partnerB || "?");
+        const { sheetId, url } = await createLiveSheet(token, title, data);
+        await store.saveSheetLink({ sheetId, sheetUrl: url });
+        try {
+          const members = await listMembers(weddingId);
+          await shareLiveSheet(token, sheetId, members.map((m) => m.email).filter(Boolean));
+        } catch (e) { console.error("Delen van live Google Sheet mislukt:", e); }
+      }
+    } catch (e) {
+      console.error("Koppelen met Google Sheets mislukt:", e);
+      // Fouten van Firebase Auth (bv. pop-up geblokkeerd/gesloten) hebben een
+      // "auth/..."-code en een eigen duidelijke melding; overige fouten (van
+      // de Sheets/Drive-API) hebben al een eigen leesbare .message.
+      setSheetError((e.code && String(e.code).startsWith("auth/")) ? authErrorMessage(e) : (e.message || "Koppelen met Google Sheets is niet gelukt."));
+    } finally {
+      setSheetBusy(false);
+    }
+  }
+
   if (!data) return (
     <div className="min-h-screen grid place-items-center">
       <div className="text-center"><img src={MONO} className="h-20 mx-auto opacity-90" alt="logo" /><p className="mt-3 text-sm text-muted">Even jullie plannen ophalen…</p></div>
@@ -239,7 +296,8 @@ export default function WeddingPlanner({ weddingId }) {
 
   return (
     <div className="min-h-screen bg-canvas pb-28">
-      <BackupWidget data={data} setData={setData} />
+      <BackupWidget data={data} setData={setData}
+        sheetLink={sheetLink} sheetConnected={!!sheetToken} sheetBusy={sheetBusy} sheetError={sheetError} onConnectSheet={connectSheet} />
       <div className="mx-auto max-w-[780px] px-4 pt-7">
         <header className="text-center pb-5">
           <img src={MONO} className="h-16 mx-auto" alt="Logo Huwelijksplanner" />
@@ -978,7 +1036,7 @@ function PhotoFeature({ data, setData, store }) {
 }
 
 /* ---------------- Back-up & herstel ---------------- */
-function BackupWidget({ data, setData }) {
+function BackupWidget({ data, setData, sheetLink, sheetConnected, sheetBusy, sheetError, onConnectSheet }) {
   const [open, setOpen] = useState(false);
   const jsonFileRef = useRef(null);
   const excelFileRef = useRef(null);
@@ -1036,7 +1094,27 @@ function BackupWidget({ data, setData }) {
           <button className="block w-full border-b border-line/70 px-4 py-3 text-left text-sm font-semibold text-ink hover:bg-canvas" onClick={() => { setOpen(false); download(); }}>⬇︎ Back-up downloaden (.json)</button>
           <button className="block w-full border-b border-line/70 px-4 py-3 text-left text-sm font-semibold text-ink hover:bg-canvas" onClick={() => { setOpen(false); jsonFileRef.current && jsonFileRef.current.click(); }}>⬆︎ Back-up terugzetten (.json)</button>
           <button className="block w-full border-b border-line/70 px-4 py-3 text-left text-sm font-semibold text-ink hover:bg-canvas" onClick={() => { setOpen(false); downloadExcel(); }}>⬇︎ Exporteren naar Excel</button>
-          <button className="block w-full px-4 py-3 text-left text-sm font-semibold text-ink hover:bg-canvas" onClick={() => { setOpen(false); excelFileRef.current && excelFileRef.current.click(); }}>⬆︎ Importeren vanuit Excel</button>
+          <button className="block w-full border-b border-line/70 px-4 py-3 text-left text-sm font-semibold text-ink hover:bg-canvas" onClick={() => { setOpen(false); excelFileRef.current && excelFileRef.current.click(); }}>⬆︎ Importeren vanuit Excel</button>
+          {sheetLink && sheetLink.sheetUrl ? (
+            <>
+              <a href={sheetLink.sheetUrl} target="_blank" rel="noreferrer" onClick={() => setOpen(false)}
+                className="block w-full border-b border-line/70 px-4 py-3 text-left text-sm font-semibold text-ink hover:bg-canvas">📊 Bekijk live Google Sheet ↗</a>
+              {sheetConnected ? (
+                <div className="px-4 py-2.5 text-xs font-semibold text-indigo-ink">✓ Deze sessie werkt live bij</div>
+              ) : (
+                <button disabled={sheetBusy} onClick={onConnectSheet}
+                  className="block w-full px-4 py-3 text-left text-sm font-semibold text-ink hover:bg-canvas disabled:opacity-50">
+                  {sheetBusy ? "Bezig…" : "🔄 Verbind deze sessie (live bijwerken)"}
+                </button>
+              )}
+            </>
+          ) : (
+            <button disabled={sheetBusy} onClick={onConnectSheet}
+              className="block w-full px-4 py-3 text-left text-sm font-semibold text-ink hover:bg-canvas disabled:opacity-50">
+              {sheetBusy ? "Bezig…" : "🔗 Koppel met live Google Sheet"}
+            </button>
+          )}
+          {sheetError && <div className="border-t border-line/70 px-4 py-2.5 text-xs font-semibold text-rose-ink">{sheetError}</div>}
         </div>
       )}
       <button onClick={() => setOpen((o) => !o)} title="Back-up, Excel-export/import"

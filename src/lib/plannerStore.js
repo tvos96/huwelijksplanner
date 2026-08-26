@@ -121,7 +121,24 @@ function createDocStore(pathSegments) {
     return list;
   }
 
-  return { load, save, subscribe, subscribePhotos, addPhoto, deletePhoto, loadPhotosOnce, ref };
+  // Koppeling met een live Google Sheet (sheetId/sheetUrl) staat als losse
+  // velden op hetzelfde document, naast "json" — zo zien beide partners
+  // dezelfde koppeling zonder dat dit de planner-sync (save/subscribe)
+  // hierboven raakt.
+  function subscribeSheetLink(onChange) {
+    if (!ref) return () => {};
+    return onSnapshot(ref, (snap) => {
+      const d = snap.exists() ? snap.data() : {};
+      onChange({ sheetId: d.sheetId || null, sheetUrl: d.sheetUrl || null });
+    }, () => {});
+  }
+
+  async function saveSheetLink({ sheetId, sheetUrl }) {
+    if (!ref) return;
+    await setDoc(ref, { sheetId, sheetUrl }, { merge: true });
+  }
+
+  return { load, save, subscribe, subscribePhotos, addPhoto, deletePhoto, loadPhotosOnce, subscribeSheetLink, saveSheetLink, ref };
 }
 
 /** Planner gekoppeld aan een geauthenticeerd huwelijksproject. */

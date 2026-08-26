@@ -1,5 +1,6 @@
 import {
   signInWithPopup, getRedirectResult, signOut, onAuthStateChanged,
+  GoogleAuthProvider, reauthenticateWithPopup,
 } from "firebase/auth";
 import {
   doc, getDoc, setDoc, collection, getDocs, serverTimestamp, runTransaction,
@@ -41,6 +42,57 @@ export async function signIn() {
   if (!auth) throw new Error("Firebase is niet beschikbaar.");
   await signInWithPopup(auth, googleProvider);
 }
+
+// ---- Google Sheets-koppeling (optioneel, los van gewoon inloggen) --------
+//
+// Gewoon inloggen vraagt alleen e-mail/naam op. Pas als iemand bewust op
+// "Koppel met live Google Sheet" klikt, vragen we er via een aparte
+// toestemmingsstap Google Drive/Sheets-rechten bij — en dan alleen "rechten
+// op bestanden die deze app zelf aanmaakt" (drive.file), niet alle Drive-
+// bestanden. Het opgehaalde toegangstoken bewaren we alleen in het geheugen
+// van deze pagina (nooit in localStorage/Firestore) en is na ongeveer een
+// uur verlopen — dan moet er opnieuw gekoppeld worden.
+const SHEETS_SCOPES = [
+  "https://www.googleapis.com/auth/spreadsheets",
+  "https://www.googleapis.com/auth/drive.file",
+];
+
+let googleAccessToken = null;
+const tokenListeners = new Set();
+
+function setGoogleAccessToken(token) {
+  googleAccessToken = token;
+  tokenListeners.forEach((cb) => { try { cb(token); } catch {} });
+}
+
+/** Het huidige Google-toegangstoken voor Sheets/Drive, of null als er
+ * (nog) geen koppeling is of die verlopen is. */
+export function getGoogleAccessToken() { return googleAccessToken; }
+
+/** Roept cb(token|null) aan zodra het token wijzigt (gekoppeld/verlopen). */
+export function onGoogleAccessTokenChange(cb) {
+  tokenListeners.add(cb);
+  return () => tokenListeners.delete(cb);
+}
+
+/** Vraagt (opnieuw) toestemming voor Google Sheets/Drive en levert een vers
+ * toegangstoken. Gebruikt reauthenticate i.p.v. een nieuwe login, zodat dit
+ * gegarandeerd hetzelfde account blijft. */
+export async function connectGoogleSheets() {
+  if (!auth || !auth.currentUser) throw new Error("Niet ingelogd.");
+  const provider = new GoogleAuthProvider();
+  provider.setCustomParameters({ prompt: "consent" });
+  SHEETS_SCOPES.forEach((scope) => provider.addScope(scope));
+  const result = await reauthenticateWithPopup(auth.currentUser, provider);
+  const cred = GoogleAuthProvider.credentialFromResult(result);
+  if (!cred || !cred.accessToken) throw new Error("Geen toegang tot Google Sheets gekregen.");
+  setGoogleAccessToken(cred.accessToken);
+  return cred.accessToken;
+}
+
+/** Verbreekt de koppeling voor deze sessie (vergeet het token). De Google
+ * Sheet zelf blijft gewoon bestaan op Drive. */
+export function disconnectGoogleSheets() { setGoogleAccessToken(null); }
 
 /** Vangt (indien aanwezig) het resultaat op van een eerdere signInWithRedirect
  * — bewaard voor het geval een browser toch alsnog naar een redirect
