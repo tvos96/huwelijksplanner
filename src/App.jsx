@@ -121,7 +121,7 @@ function VenueMap({ venues }) {
       if (mapRef.current) { mapRef.current.remove(); mapRef.current = null; }
       const map = L.map(ref.current, { scrollWheelZoom: false }); mapRef.current = map;
       L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { attribution: "© OpenStreetMap", maxZoom: 18 }).addTo(map);
-      const colors = { fav: "#F5A524", open: "#17B0A7", rejected: "#F2547B" };
+      const colors = { fav: "#FF9E1F", open: "#17B0A7", rejected: "#E6375C" };
       const bounds = [];
       pts.forEach(({ v, c }) => {
         const col = v.fav ? colors.fav : (v.status === "rejected" ? colors.rejected : colors.open);
@@ -532,7 +532,7 @@ function Venues({ data, setData }) {
                 <input className={cn("w-full bg-transparent text-lg font-bold focus:outline-none", x.status === "rejected" && "line-through")} value={x.name} onChange={(e) => upd(x.id, "name", e.target.value)} />
                 <div className="mt-0.5 text-xs text-muted">{addrOf(x) || [x.place, x.country].filter(Boolean).join(" · ") || "Adres nog onbekend"}</div>
               </div>
-              <IconBtn label="Favoriet" onClick={() => upd(x.id, "fav", !x.fav)} className={cn(x.fav && "text-amber hover:text-amber")}><Star size={20} fill={x.fav ? "#F5A524" : "none"} /></IconBtn>
+              <IconBtn label="Favoriet" onClick={() => upd(x.id, "fav", !x.fav)} className={cn(x.fav && "text-amber hover:text-amber")}><Star size={20} fill={x.fav ? "#FF9E1F" : "none"} /></IconBtn>
               <IconBtn label="Verwijderen" onClick={() => del(x.id)}><X size={18} /></IconBtn>
             </div>
             <div className="mt-2 flex gap-2">
