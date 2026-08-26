@@ -8,56 +8,151 @@ const RSVP_FROM_LABEL = { "komt": "yes", "komt niet": "no", "onbekend": "pending
 function ynLabel(b) { return b ? "Ja" : "Nee"; }
 function ynValue(s) { return /^(ja|yes|waar|true|1)$/i.test(String(s || "").trim()); }
 
+// Zelfde kleurenschema als de app: robijnrood (hoofd), blauw (secundair),
+// goud (tertiair) — hier gebruikt als tabblad-accent zodat het bestand er
+// herkenbaar uitziet.
+const SHEET_COLORS = {
+  rose:   { header: "FFE6375C", stripe: "FFFAE6EA" },
+  indigo: { header: "FF1F85FF", stripe: "FFE3EFFD" },
+  amber:  { header: "FFFF9E1F", stripe: "FFFDF1E3" },
+};
+const INK = "FF221E2E";
+const LINE = "FFECE7F1";
+
+function styleSheet(ws, { tone, columns, rows }) {
+  ws.columns = columns;
+  ws.addRows(rows);
+
+  const colors = SHEET_COLORS[tone];
+  const header = ws.getRow(1);
+  header.eachCell((cell) => {
+    cell.font = { bold: true, color: { argb: "FFFFFFFF" } };
+    cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: colors.header } };
+    cell.alignment = { vertical: "middle" };
+    cell.border = { bottom: { style: "thin", color: { argb: colors.header } } };
+  });
+  header.height = 20;
+  ws.views = [{ state: "frozen", ySplit: 1 }];
+  ws.autoFilter = { from: { row: 1, column: 1 }, to: { row: 1, column: columns.length } };
+
+  for (let r = 2; r <= ws.rowCount; r++) {
+    const row = ws.getRow(r);
+    const striped = r % 2 === 0;
+    row.eachCell({ includeEmpty: true }, (cell) => {
+      cell.font = { color: { argb: INK } };
+      if (striped) cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: colors.stripe } };
+      cell.border = { bottom: { style: "thin", color: { argb: LINE } } };
+    });
+  }
+}
+
 /**
  * Bouwt een .xlsx-bestand met alle plannergegevens in aparte tabbladen
- * (Gasten, Locaties, Budget, Taken, Contacten) en start de download.
+ * (Gasten, Locaties, Budget, Taken, Contacten), opgemaakt in het
+ * kleurenschema van de app, en start de download.
  */
-export function exportExcel(data, filename) {
-  const wb = XLSX.utils.book_new();
+export async function exportExcel(data, filename) {
+  const { default: ExcelJS } = await import("exceljs");
+  const wb = new ExcelJS.Workbook();
+  wb.creator = "Huwelijksplanner";
+  wb.created = new Date();
 
   // --- Gasten ---
-  const guestRows = [
-    ["Naam", "Aantal", "Status", "Relatie", "Kant", "Notitie"],
-    ...(data.guests || []).map((g) => [g.name || "", Number(g.count) || 0, RSVP_LABEL[g.rsvp] || "Onbekend", g.rel || "", g.side || "", g.diet || ""]),
-  ];
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(guestRows), "Gasten");
+  styleSheet(wb.addWorksheet("Gasten"), {
+    tone: "indigo",
+    columns: [
+      { header: "Naam", key: "name", width: 26 },
+      { header: "Aantal", key: "count", width: 10 },
+      { header: "Status", key: "status", width: 14 },
+      { header: "Relatie", key: "rel", width: 18 },
+      { header: "Kant", key: "side", width: 12 },
+      { header: "Notitie", key: "note", width: 30 },
+    ],
+    rows: (data.guests || []).map((g) => ({
+      name: g.name || "", count: Number(g.count) || 0, status: RSVP_LABEL[g.rsvp] || "Onbekend",
+      rel: g.rel || "", side: g.side || "", note: g.diet || "",
+    })),
+  });
 
   // --- Locaties ---
-  const venueRows = [
-    ["Naam", "Status", "Favoriet", "Land", "Plaats", "Adres", "Website", "Opmerking Ita", "Opmerking Tim", "Coördinaten"],
-    ...(data.venues || []).map((v) => [
-      v.name || "", v.status === "rejected" ? "Afgekruist" : "Interessant", ynLabel(!!v.fav),
-      v.country || "", v.place || "", v.address || "", v.web || "", v.ita || "", v.tim || "", v.coords || "",
-    ]),
-  ];
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(venueRows), "Locaties");
+  styleSheet(wb.addWorksheet("Locaties"), {
+    tone: "rose",
+    columns: [
+      { header: "Naam", key: "name", width: 26 },
+      { header: "Status", key: "status", width: 14 },
+      { header: "Favoriet", key: "fav", width: 10 },
+      { header: "Land", key: "country", width: 14 },
+      { header: "Plaats", key: "place", width: 16 },
+      { header: "Adres", key: "address", width: 30 },
+      { header: "Website", key: "web", width: 26 },
+      { header: "Opmerking Ita", key: "ita", width: 26 },
+      { header: "Opmerking Tim", key: "tim", width: 26 },
+      { header: "Coördinaten", key: "coords", width: 18 },
+    ],
+    rows: (data.venues || []).map((v) => ({
+      name: v.name || "", status: v.status === "rejected" ? "Afgekruist" : "Interessant", fav: ynLabel(!!v.fav),
+      country: v.country || "", place: v.place || "", address: v.address || "", web: v.web || "",
+      ita: v.ita || "", tim: v.tim || "", coords: v.coords || "",
+    })),
+  });
 
   // --- Budget (totalen bovenaan, daaronder de begrotingsposten) ---
   const b = data.budget || { total: 0, saved: 0, items: [] };
-  const budgetRows = [
-    ["Totaalbudget (doel)", Number(b.total) || 0],
-    ["Op de rekening", Number(b.saved) || 0],
-    [],
-    ["Post", "Begroot", "Betaald"],
-    ...(b.items || []).map((x) => [x.label || "", Number(x.est) || 0, Number(x.paid) || 0]),
-  ];
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(budgetRows), "Budget");
+  const budgetWs = wb.addWorksheet("Budget");
+  budgetWs.columns = [{ key: "a", width: 26 }, { key: "b", width: 16 }, { key: "c", width: 16 }];
+  budgetWs.addRow(["Totaalbudget (doel)", Number(b.total) || 0]).font = { bold: true, color: { argb: INK } };
+  budgetWs.addRow(["Op de rekening", Number(b.saved) || 0]).font = { bold: true, color: { argb: INK } };
+  budgetWs.addRow([]);
+  const budgetHeaderRow = budgetWs.addRow(["Post", "Begroot", "Betaald"]);
+  const budgetColors = SHEET_COLORS.amber;
+  budgetHeaderRow.eachCell((cell) => {
+    cell.font = { bold: true, color: { argb: "FFFFFFFF" } };
+    cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: budgetColors.header } };
+  });
+  (b.items || []).forEach((x, i) => {
+    const row = budgetWs.addRow([x.label || "", Number(x.est) || 0, Number(x.paid) || 0]);
+    if (i % 2 === 1) row.eachCell({ includeEmpty: true }, (cell) => {
+      cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: budgetColors.stripe } };
+    });
+    row.eachCell({ includeEmpty: true }, (cell) => { cell.font = { color: { argb: INK } }; });
+  });
+  budgetWs.views = [{ state: "frozen", ySplit: 4 }];
 
   // --- Taken ---
-  const taskRows = [
-    ["Taak", "Afgerond"],
-    ...(data.tasks || []).map((t) => [t.label || "", ynLabel(!!t.done)]),
-  ];
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(taskRows), "Taken");
+  styleSheet(wb.addWorksheet("Taken"), {
+    tone: "indigo",
+    columns: [
+      { header: "Taak", key: "label", width: 40 },
+      { header: "Afgerond", key: "done", width: 12 },
+    ],
+    rows: (data.tasks || []).map((t) => ({ label: t.label || "", done: ynLabel(!!t.done) })),
+  });
 
   // --- Contacten ---
-  const vendorRows = [
-    ["Naam", "Rol", "Telefoon", "Email", "Prijs", "Status", "Notitie"],
-    ...(data.vendors || []).map((v) => [v.name || "", v.role || "", v.phone || "", v.email || "", v.price || "", v.status === "geboekt" ? "Geboekt" : v.status === "optie" ? "Optie" : "", v.note || ""]),
-  ];
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(vendorRows), "Contacten");
+  styleSheet(wb.addWorksheet("Contacten"), {
+    tone: "amber",
+    columns: [
+      { header: "Naam", key: "name", width: 26 },
+      { header: "Rol", key: "role", width: 18 },
+      { header: "Telefoon", key: "phone", width: 16 },
+      { header: "Email", key: "email", width: 24 },
+      { header: "Prijs", key: "price", width: 14 },
+      { header: "Status", key: "status", width: 12 },
+      { header: "Notitie", key: "note", width: 30 },
+    ],
+    rows: (data.vendors || []).map((v) => ({
+      name: v.name || "", role: v.role || "", phone: v.phone || "", email: v.email || "", price: v.price || "",
+      status: v.status === "geboekt" ? "Geboekt" : v.status === "optie" ? "Optie" : "", note: v.note || "",
+    })),
+  });
 
-  XLSX.writeFile(wb, filename || "huwelijksplanner.xlsx");
+  const buf = await wb.xlsx.writeBuffer();
+  const blob = new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = filename || "huwelijksplanner.xlsx";
+  document.body.appendChild(a); a.click(); a.remove();
+  URL.revokeObjectURL(url);
 }
 
 function sheetToRows(wb, name) {

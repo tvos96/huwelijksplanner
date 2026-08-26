@@ -1011,7 +1011,8 @@ function BackupWidget({ data, setData }) {
 
   function downloadExcel() {
     const d = new Date(), pad = (x) => String(x).padStart(2, "0");
-    exportExcel(data, "huwelijksplanner-" + d.getFullYear() + pad(d.getMonth() + 1) + pad(d.getDate()) + ".xlsx");
+    exportExcel(data, "huwelijksplanner-" + d.getFullYear() + pad(d.getMonth() + 1) + pad(d.getDate()) + ".xlsx")
+      .catch((err) => alert("Excel-export is niet gelukt: " + (err.message || err)));
   }
 
   async function onPickExcel(e) {
