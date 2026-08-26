@@ -150,15 +150,36 @@ Rechtsboven zit een ☁-knopje met de volgende opties:
 
 ### Google Sheets-koppeling (eenmalige instelling, alleen als je dit gebruikt)
 Voor **"Koppel met live Google Sheet"** vraagt de app naast e-mail/naam ook
-toegang tot Google Drive/Sheets — een "gevoelig" OAuth-scope. Omdat dit
-project waarschijnlijk niet door Google geverifieerd is (dat is alleen nodig
-voor apps met veel gebruikers), kan Google bij het koppelen een
-"Google heeft deze app niet geverifieerd"-scherm tonen. Voor eigen gebruik is
-dat geen probleem — klik op "Geavanceerd" → "Doorgaan naar (project)". Zorg
-wel dat jullie beide Google-accounts als **testgebruiker** zijn toegevoegd in
-de Google Cloud Console van het Firebase-project
-(**APIs & Services → OAuth consent screen → Test users**), anders weigert
-Google de toestemming helemaal. Dit hoef je maar één keer in te stellen.
+toegang tot Google Drive/Sheets van diegene die op de knop klikt — een
+"gevoelig" OAuth-scope, dus Google toont daarbij altijd een eigen
+toestemmingsscherm. Dat hoort zo en geldt voor iedereen die de koppeling
+gebruikt (dat kun jij niet overslaan of vooraf regelen voor een ander).
+
+Waar je wél iets voor moet instellen — **eenmalig, niet per stel** — is of
+Google dat toestemmingsscherm laat zien als een onschuldige "wil je dit
+toestaan?"-vraag, of als een afschrikwekkende "Google heeft deze app niet
+geverifieerd"-waarschuwing die verdere stappen nodig heeft. Dat hangt af van
+de **publicatiestatus** van de OAuth-configuratie in de Google Cloud Console
+van het Firebase-project (**APIs & Services → OAuth consent screen**):
+
+- Staat die nog op **"Testing"**: dan werkt de koppeling uitsluitend voor
+  Google-accounts die jij daar handmatig als testgebruiker hebt toegevoegd
+  — voor ieder nieuw stel zou je dus zelf iets moeten instellen. Dat is
+  precies wat je niet wilt.
+- Zet 'm op **"In production"**: dan kan *elk* Google-account de koppeling
+  gebruiken, zonder dat jij iets hoeft te doen per gebruiker. Voor
+  "gevoelige" scopes zoals hier (`drive.file`/`spreadsheets`, geen toegang
+  tot iemands volledige Drive) mag dat zonder Google's uitgebreide
+  verificatieproces — je hoeft alleen op "Publish app" te klikken. Iedereen
+  ziet dan nog wél het "niet geverifieerd"-waarschuwingsscherm (dat
+  verdwijnt pas ná een echte Google-verificatie, met privacyverklaring en
+  beoordeling — voor een klein project meestal niet de moeite waard), maar
+  kan daar zelf doorheen klikken ("Geavanceerd" → "Doorgaan naar
+  [projectnaam]") zonder dat jij ergens tussen hoeft te zitten.
+
+Kortom: zet de publicatiestatus eenmalig op **"In production"** en laat
+"Testing" (met een lijst testgebruikers) links liggen — anders moet je
+inderdaad voor elk nieuw stel handmatig toegang gaan regelen.
 
 ## Structuur
 - `src/App.jsx` — de planner zelf (schermen, tabs, foto/video-gallerij, back-up, Excel)
