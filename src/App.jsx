@@ -143,7 +143,6 @@ function VenueMap({ venues }) {
 function Pill({ active, tone = "indigo", children, onClick }) {
   const tones = {
     indigo: "bg-indigo text-white border-indigo",
-    teal: "bg-teal text-white border-teal",
     amber: "bg-amber text-white border-amber",
     rose: "bg-rose text-white border-rose",
     ink: "bg-ink text-white border-ink",
@@ -157,8 +156,8 @@ function Pill({ active, tone = "indigo", children, onClick }) {
   );
 }
 const TILE = {
-  teal: "bg-teal-soft text-teal-ink", rose: "bg-rose-soft text-rose-ink",
-  amber: "bg-amber-soft text-amber-ink", lilac: "bg-lilac-soft text-lilac-ink",
+  indigo: "bg-indigo-soft text-indigo-ink", rose: "bg-rose-soft text-rose-ink",
+  amber: "bg-amber-soft text-amber-ink",
 };
 function Tile({ tone, label, value, sub, onClick }) {
   return (
@@ -356,10 +355,10 @@ function Overview({ data, setData, set, editSettings, setEditSettings, go }) {
       )}
 
       <div className="grid grid-cols-2 gap-3">
-        <Tile tone="teal" label="Gasten" value={<>{coming} <span className="text-base font-semibold opacity-60">/ {invited}</span></>} sub="komen / uitgenodigd" onClick={() => go("gasten")} />
+        <Tile tone="indigo" label="Gasten" value={<>{coming} <span className="text-base font-semibold opacity-60">/ {invited}</span></>} sub="komen / uitgenodigd" onClick={() => go("gasten")} />
         <Tile tone="rose" label="Locaties" value={<>{vOpen} <span className="text-base font-semibold opacity-60">· {vFav}★</span></>} sub="in beeld · favoriet" onClick={() => go("locaties")} />
         <Tile tone="amber" label="Budget bijeen" value={savedPct + "%"} sub={euro(data.budget.saved) + " van " + euro(data.budget.total)} onClick={() => go("budget")} />
-        <Tile tone="lilac" label="Taken" value={<>{done} <span className="text-base font-semibold opacity-60">/ {data.tasks.length}</span></>} sub="afgerond" onClick={() => go("taken")} />
+        <Tile tone="indigo" label="Taken" value={<>{done} <span className="text-base font-semibold opacity-60">/ {data.tasks.length}</span></>} sub="afgerond" onClick={() => go("taken")} />
       </div>
 
       <Card>
@@ -391,7 +390,7 @@ function Overview({ data, setData, set, editSettings, setEditSettings, go }) {
           <CardContent className="space-y-1">
             {sorted.map((i) => (
               <div key={i.id} className="flex items-center gap-3 border-t border-line py-2 first:border-0">
-                <Input className="w-20 font-semibold text-teal-ink" value={i.time} placeholder="00:00" onChange={(e) => updS(i.id, "time", e.target.value)} />
+                <Input className="w-20 font-semibold text-indigo-ink" value={i.time} placeholder="00:00" onChange={(e) => updS(i.id, "time", e.target.value)} />
                 <Input className="flex-1" value={i.label} onChange={(e) => updS(i.id, "label", e.target.value)} />
                 <IconBtn label="Verwijderen" onClick={() => delS(i.id)}><X size={18} /></IconBtn>
               </div>
@@ -422,7 +421,7 @@ function Guests({ data, setData }) {
         <CardHeader><CardTitle>Gasten</CardTitle><CardDescription>Wie komt er, en wie moet nog reageren?</CardDescription></CardHeader>
         <CardContent>
           <div className="flex gap-6">
-            <div><div className="text-2xl font-extrabold text-teal-ink">{coming}</div><div className="text-xs text-muted">komen</div></div>
+            <div><div className="text-2xl font-extrabold text-indigo-ink">{coming}</div><div className="text-xs text-muted">komen</div></div>
             <div><div className="text-2xl font-extrabold text-indigo-ink">{invited}</div><div className="text-xs text-muted">uitgenodigd</div></div>
             <div><div className="text-2xl font-extrabold text-amber-ink">{pending}</div><div className="text-xs text-muted">geen reactie</div></div>
           </div>
@@ -444,7 +443,7 @@ function Guests({ data, setData }) {
             </div>
             {x.rel && <div className="mt-1 text-xs text-muted">{x.rel}</div>}
             <div className="mt-2 flex gap-2">
-              <Pill tone="teal" active={x.rsvp === "yes"} onClick={() => upd(x.id, "rsvp", "yes")}>Komt</Pill>
+              <Pill tone="indigo" active={x.rsvp === "yes"} onClick={() => upd(x.id, "rsvp", "yes")}>Komt</Pill>
               <Pill tone="rose" active={x.rsvp === "no"} onClick={() => upd(x.id, "rsvp", "no")}>Komt niet</Pill>
               <Pill tone="amber" active={x.rsvp === "pending"} onClick={() => upd(x.id, "rsvp", "pending")}>Onbekend</Pill>
             </div>
@@ -506,7 +505,7 @@ function Venues({ data, setData }) {
         <CardContent>
           <VenueMap venues={v} />
           <div className="mt-3 flex flex-wrap gap-4 text-xs text-muted">
-            <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-teal" />Interessant</span>
+            <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-indigo" />Interessant</span>
             <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-amber" />Favoriet</span>
             <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-rose" />Afgekruist</span>
           </div>
@@ -536,7 +535,7 @@ function Venues({ data, setData }) {
               <IconBtn label="Verwijderen" onClick={() => del(x.id)}><X size={18} /></IconBtn>
             </div>
             <div className="mt-2 flex gap-2">
-              <Pill tone="teal" active={x.status !== "rejected"} onClick={() => upd(x.id, "status", "open")}>Interessant</Pill>
+              <Pill tone="indigo" active={x.status !== "rejected"} onClick={() => upd(x.id, "status", "open")}>Interessant</Pill>
               <Pill tone="rose" active={x.status === "rejected"} onClick={() => upd(x.id, "status", "rejected")}>Afgekruist</Pill>
             </div>
             <FieldLabel>Opmerking Ita</FieldLabel>
@@ -551,7 +550,7 @@ function Venues({ data, setData }) {
             </div>
             <FieldLabel>Locatie op de kaart</FieldLabel>
             <Input placeholder="Google Maps-link of coördinaten (52.09, 4.88)" value={x.coords || ""} onChange={(e) => upd(x.id, "coords", e.target.value)} />
-            <div className={cn("mt-1 text-xs", coordsOf(x) ? "text-teal-ink" : "text-muted")}>{coordsOf(x) ? "✓ staat op de kaart" : "Nog niet op de kaart"}</div>
+            <div className={cn("mt-1 text-xs", coordsOf(x) ? "text-indigo-ink" : "text-muted")}>{coordsOf(x) ? "✓ staat op de kaart" : "Nog niet op de kaart"}</div>
             <div className="mt-3 flex flex-wrap items-center gap-4">
               <a className="inline-flex items-center gap-1 text-sm text-indigo-ink underline" target="_blank" rel="noreferrer" href={"https://www.google.com/maps/search/?api=1&query=" + encodeURIComponent([x.name, x.place, x.country].filter(Boolean).join(" "))}><MapPin size={14} /> Op Google Maps</a>
               {x.web && isLink(x.web) && <a className="inline-flex items-center gap-1 text-sm text-indigo-ink underline" target="_blank" rel="noreferrer" href={x.web.startsWith("http") ? x.web : "https://" + x.web}><ExternalLink size={14} /> Website</a>}
@@ -599,7 +598,7 @@ function Budget({ data, setData }) {
           <Progress value={estPct} barClassName={estPct > 100 ? "bg-rose" : "bg-amber"} />
           <div className="mt-4 flex gap-6">
             <div><div className="text-2xl font-extrabold text-amber-ink">{euro(estTotal)}</div><div className="text-xs text-muted">begroot</div></div>
-            <div><div className="text-2xl font-extrabold text-teal-ink">{euro(paidTotal)}</div><div className="text-xs text-muted">betaald</div></div>
+            <div><div className="text-2xl font-extrabold text-indigo-ink">{euro(paidTotal)}</div><div className="text-xs text-muted">betaald</div></div>
             <div><div className={cn("text-2xl font-extrabold", remaining < 0 ? "text-rose-ink" : "text-indigo-ink")}>{euro(remaining)}</div><div className="text-xs text-muted">ruimte over</div></div>
           </div>
         </CardContent>
@@ -636,7 +635,7 @@ function Tasks({ data, setData }) {
     <div className="space-y-4">
       <Card>
         <CardHeader><CardTitle>Taken</CardTitle><CardDescription>{done} van {t.length} afgerond — goed bezig.</CardDescription></CardHeader>
-        <CardContent><Progress value={pct} barClassName="bg-teal" /></CardContent>
+        <CardContent><Progress value={pct} barClassName="bg-indigo" /></CardContent>
       </Card>
       <Card>
         <CardContent className="pt-4 space-y-1">
@@ -644,7 +643,7 @@ function Tasks({ data, setData }) {
             <div key={x.id} className="flex items-center gap-3 border-t border-line py-2 first:border-0">
               <button onClick={() => toggle(x.id)} aria-label="Afronden"
                 className={cn("grid h-6 w-6 shrink-0 place-items-center rounded-full border-2 transition-colors",
-                  x.done ? "border-teal bg-teal text-white" : "border-teal text-transparent hover:bg-teal-soft")}>
+                  x.done ? "border-indigo bg-indigo text-white" : "border-indigo text-transparent hover:bg-indigo-soft")}>
                 <Check size={14} strokeWidth={3} />
               </button>
               <input className={cn("flex-1 bg-transparent focus:outline-none", x.done && "text-muted line-through")} value={x.label} onChange={(e) => upd(x.id, e.target.value)} />
@@ -745,7 +744,7 @@ function Vendors({ data, setData }) {
             </div>
             <div className="mt-2 flex flex-wrap gap-2">
               <Pill tone="amber" active={x.status === "optie"} onClick={() => upd(x.id, "status", x.status === "optie" ? "" : "optie")}>Optie</Pill>
-              <Pill tone="teal" active={x.status === "geboekt"} onClick={() => upd(x.id, "status", x.status === "geboekt" ? "" : "geboekt")}>Geboekt</Pill>
+              <Pill tone="indigo" active={x.status === "geboekt"} onClick={() => upd(x.id, "status", x.status === "geboekt" ? "" : "geboekt")}>Geboekt</Pill>
             </div>
             <div className="mt-2 grid grid-cols-2 gap-2">
               <div><FieldLabel>Telefoon</FieldLabel><Input type="tel" placeholder="06-..." value={x.phone || ""} onChange={(e) => upd(x.id, "phone", e.target.value)} /></div>

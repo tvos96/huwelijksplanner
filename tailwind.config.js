@@ -14,8 +14,6 @@ export default {
         rose:   { DEFAULT: "#E6375C", soft: "#FAE6EA", ink: "#9A132F" }, // hoofdkleur: robijnrood
         indigo: { DEFAULT: "#1F85FF", soft: "#E3EFFD", ink: "#004FAD" }, // secundair: blauw van de steen
         amber:  { DEFAULT: "#FF9E1F", soft: "#FDF1E3", ink: "#AD6200" }, // tertiair: goud van de ring
-        teal:   { DEFAULT: "#17B0A7", soft: "#D3F1EE", ink: "#0B6C66" },
-        lilac:  { DEFAULT: "#A855F7", soft: "#F1E4FE", ink: "#7A28C4" },
       },
       fontFamily: {
         sans: ["Inter", "system-ui", "-apple-system", "Segoe UI", "Roboto", "Helvetica Neue", "Arial", "sans-serif"],
