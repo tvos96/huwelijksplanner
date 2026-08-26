@@ -9,10 +9,12 @@ export default {
         ink: "#221E2E",
         muted: "#7C7689",
         line: "#ECE7F1",
-        rose:   { DEFAULT: "#F2547B", soft: "#FDE7EC", ink: "#C42A54" },
-        amber:  { DEFAULT: "#F5A524", soft: "#FDECC9", ink: "#96610A" },
+        // Hoofd-, secundaire en tertiaire kleur zijn afgeleid van het app-logo:
+        // het robijnrood, het blauw van de steen en het goud van de ringband.
+        rose:   { DEFAULT: "#E6375C", soft: "#FAE6EA", ink: "#9A132F" }, // hoofdkleur: robijnrood
+        indigo: { DEFAULT: "#1F85FF", soft: "#E3EFFD", ink: "#004FAD" }, // secundair: blauw van de steen
+        amber:  { DEFAULT: "#FF9E1F", soft: "#FDF1E3", ink: "#AD6200" }, // tertiair: goud van de ring
         teal:   { DEFAULT: "#17B0A7", soft: "#D3F1EE", ink: "#0B6C66" },
-        indigo: { DEFAULT: "#6366F1", soft: "#E5E5FD", ink: "#3D3FBF" },
         lilac:  { DEFAULT: "#A855F7", soft: "#F1E4FE", ink: "#7A28C4" },
       },
       fontFamily: {
