@@ -6,7 +6,14 @@
   directory = "netlify/functions"
   node_bundler = "esbuild"
 
-# Single-page app: alle niet-function routes naar index.html
+# /api/* wijst (net als op Cloudflare Pages) naar dezelfde functies, zodat de
+# front-end overal met hetzelfde pad kan werken.
+[[redirects]]
+  from = "/api/*"
+  to = "/.netlify/functions/:splat"
+  status = 200
+
+# Single-page app: alle overige routes naar index.html
 [[redirects]]
   from = "/*"
   to = "/index.html"

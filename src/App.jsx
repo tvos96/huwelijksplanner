@@ -530,7 +530,7 @@ function Venues({ data, setData }) {
   const addFromLink = async () => {
     const url = link.trim(); if (!url) return; setLoading(true);
     try {
-      const res = await fetch("/.netlify/functions/place?link=" + encodeURIComponent(url));
+      const res = await fetch("/api/place?link=" + encodeURIComponent(url));
       if (res.ok) {
         const d = await res.json();
         if (!d.error) {
@@ -739,7 +739,7 @@ function Vendors({ data, setData }) {
     const url = link.trim(); if (!url) return; setLoading(true);
     try {
       const param = isMapsUrl(url) ? "link=" + encodeURIComponent(url) : "website=" + encodeURIComponent(url);
-      const res = await fetch("/.netlify/functions/vendor?" + param);
+      const res = await fetch("/api/vendor?" + param);
       const d = await res.json();
       if (res.ok && !d.error) {
         addVendor({ name: d.name || "Nieuw contact", role: d.role || "", phone: d.phone || "", email: d.email || "", web: d.website || (isMapsUrl(url) ? "" : url) });

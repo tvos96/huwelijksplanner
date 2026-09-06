@@ -1,0 +1,4 @@
+# Cloudflare Pages: single-page app, alle niet-gevonden routes naar index.html
+# (API-routes onder /api/* worden door de Pages Functions in functions/api/
+# afgehandeld en komen dus nooit bij deze regel terecht).
+/*    /index.html   200
