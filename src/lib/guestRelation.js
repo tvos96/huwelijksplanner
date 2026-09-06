@@ -34,6 +34,11 @@ export function parseRelationText(raw) {
   const stripped = legacy.replace(/^(Tim\/Ita|Tim|Ita)\s*-\s*/i, "").trim();
   const t = stripped.toLowerCase();
 
+  // Sommige oude gasten hadden alleen de kant ("Tim", "Ita", "Tim/Ita") als
+  // "rel"-waarde staan, zonder eigenlijke relatie-omschrijving erachter (dus
+  // niets om naar "Overig" over te zetten) — die tellen als nog niet ingevuld.
+  if (!t || /^(tim\/ita|tim|ita)$/.test(t)) return { relType: "", relOther: "" };
+
   const exact = RELATION_TYPES.find((r) => r.toLowerCase() === t);
   if (exact) return { relType: exact, relOther: "" };
 
@@ -46,6 +51,16 @@ export function parseRelationText(raw) {
   if (/vriend/.test(t)) return { relType: "Vriend(in)", relOther: "" };
   if (/collega/.test(t)) return { relType: "Collega", relOther: "" };
   return { relType: "Overig", relOther: stripped };
+}
+
+// Ruimt gasten op die door een eerdere (te ruime) migratie als "Overig" met
+// alleen de kant ("Tim"/"Ita"/"Tim/Ita") als tekst zijn weggeschreven — dat is
+// geen echte relatie-omschrijving, dus die telt weer als nog niet ingevuld.
+export function cleanupBareOverig(g) {
+  if (g.relType === "Overig" && /^(tim\/ita|tim|ita)$/i.test(String(g.relOther || "").trim())) {
+    return { ...g, relType: "", relOther: "" };
+  }
+  return g;
 }
 
 // Geeft de weer te geven/exporteren tekst voor een gast terug.

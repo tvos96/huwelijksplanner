@@ -11,7 +11,7 @@ import { Badge } from "./components/ui/badge";
 import { Input, Textarea, Select } from "./components/ui/input";
 import { Progress } from "./components/ui/progress";
 import { MONO, COUPLE_COLOR, COUPLE_EMPTY, VENUE_COORDS, VENUE_ADDR } from "./data";
-import { RELATION_TYPES, SIDE_OPTIONS, parseRelationText } from "./lib/guestRelation";
+import { RELATION_TYPES, SIDE_OPTIONS, parseRelationText, cleanupBareOverig } from "./lib/guestRelation";
 import { createWeddingStore, syncAvailable } from "./lib/plannerStore";
 import { exportExcel, importExcel } from "./lib/excel";
 import { listMembers, connectGoogleSheets, getGoogleAccessToken, onGoogleAccessTokenChange, authErrorMessage } from "./lib/weddingAuth";
@@ -71,8 +71,9 @@ export const defaultData = ({ partnerA = "", partnerB = "" } = {}) => ({
 /* ---------- eenmalige migratie: oude vrije-tekst "rel" -> relType/relOther ---------- */
 function migrateGuest(g) {
   if (g.relType !== undefined) {
-    if (g.rel === undefined && g.count === undefined) return g;
-    const { rel, count, ...rest } = g;
+    const cleaned = cleanupBareOverig(g);
+    if (cleaned.rel === undefined && cleaned.count === undefined) return cleaned;
+    const { rel, count, ...rest } = cleaned;
     return rest;
   }
   const { relType, relOther } = parseRelationText(g.rel);
