@@ -1,6 +1,6 @@
 {
-  "name": "Tim & Ita · Huwelijksplanner",
-  "short_name": "T & I",
+  "name": "Huwelijksplanner",
+  "short_name": "Planner",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#FAFAF9",

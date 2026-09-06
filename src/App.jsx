@@ -21,42 +21,55 @@ import { createLiveSheet, shareLiveSheet, pushToLiveSheet } from "./lib/sheetsSy
 const STORE_KEY = "wedding-planner-tim-ita-v2";
 const TOUR_SEEN_KEY = "wedding-planner-tour-seen-v1";
 
-/* ---------- rondleiding: één stap per onderdeel, plus een afsluitende stap ---------- */
+/* ---------- rondleiding: één stap per onderdeel, elk met een eigen "key" ---------- */
+/* zodat "uitleg over huidige tab" altijd precies één stap oplevert, ook al       */
+/* komt hetzelfde tabblad ("overzicht") op meerdere plekken in de volledige       */
+/* rondleiding voor.                                                              */
 const TOUR_STEPS = [
   {
-    tab: "overzicht",
+    key: "overzicht", tab: "overzicht",
     title: "Welkom bij jullie huwelijksplanner!",
     text: "Hier zien jullie in één oogopslag de belangrijkste cijfers en stellen jullie de trouwdatum en basisgegevens in. Alles wat je verderop ziet — budgetcategorieën, een taken-checklist, een dagplanning — is een voorbeeld om mee te starten. Pas gerust alles aan, verwijder wat niet van toepassing is en voeg toe wat jullie nodig hebben.",
   },
   {
-    tab: "gasten",
+    key: "gasten", tab: "gasten",
     title: "Gasten",
     text: "Houd hier bij wie er komt. Voeg per gast een naam toe, kies de kant (bruid of bruidegom) en de relatie, en volg de RSVP-status bij.",
   },
   {
-    tab: "locaties",
+    key: "locaties", tab: "locaties",
     title: "Locaties",
     text: "Verzamel hier trouwlocaties die jullie overwegen. Plak een Google Maps-link of gewoon de website van de locatie, en de app haalt automatisch adres, telefoon en beoordeling op.",
   },
   {
-    tab: "budget",
+    key: "budget", tab: "budget",
     title: "Budget",
     text: "Een voorbeeldverdeling in categorieën staat klaar op € 0 — vul jullie eigen begroting en gespaarde bedrag in, en voeg gerust eigen categorieën toe of verwijder wat niet nodig is.",
   },
   {
-    tab: "taken",
+    key: "taken", tab: "taken",
     title: "Taken",
     text: "Een standaard trouw-checklist om mee te beginnen. Vink af wat klaar is, verwijder wat niet van toepassing is en voeg jullie eigen taken toe.",
   },
   {
-    tab: "contacten",
+    key: "contacten", tab: "contacten",
     title: "Contacten",
     text: "Houd hier leveranciers bij — fotograaf, cateraar, DJ, en zo verder. Ook hier kun je gegevens automatisch laten ophalen via een Google Maps-link of website.",
   },
   {
-    tab: "overzicht",
+    key: "invite", tab: null,
+    title: "Partner uitnodigen",
+    text: "Linksboven (het icoon met de mensjes) zie je wie er al toegang heeft tot jullie planner. Klik erop om een eenmalige uitnodigingscode te genereren en stuur die naar je partner, bijvoorbeeld via WhatsApp. Die logt in met een Google-account en vult de code in bij \"Ik heb een uitnodigingscode\" — vanaf dat moment zien jullie dezelfde, live bijgewerkte planner.",
+  },
+  {
+    key: "backup", tab: null,
+    title: "Back-up, Excel & Google Sheets",
+    text: "Rechtsboven (het wolkje) kun je een back-up downloaden of terugzetten, alles exporteren naar of importeren vanuit Excel, en optioneel een live Google Sheet koppelen dat automatisch meebijwerkt zodra jullie planner verandert.",
+  },
+  {
+    key: "help", tab: "overzicht",
     title: "Nog vragen?",
-    text: "Klik op het vraagteken rechtsboven om deze rondleiding (of alleen het onderdeel waar je nu bent) nog eens te bekijken. Linksboven zie je wie er toegang heeft en kun je je partner uitnodigen; rechtsboven (het wolkje) maak je een back-up of exporteer je naar Excel of Google Sheets.",
+    text: "Klik op het vraagteken rechtsboven om deze rondleiding nog eens te bekijken — in zijn geheel, of alleen de uitleg over het onderdeel waar je op dat moment bent.",
   },
 ];
 
@@ -365,8 +378,8 @@ export default function WeddingPlanner({ weddingId }) {
   const currentTabLabel = (tabs.find(([k]) => k === tab) || [, ""])[1];
   const startTour = (scope) => {
     if (scope === "all") { setTour({ steps: TOUR_STEPS, index: 0 }); return; }
-    const wantTab = scope === "current" ? tab : scope;
-    const steps = TOUR_STEPS.filter((s) => s.tab === wantTab);
+    const wantKey = scope === "current" ? tab : scope;
+    const steps = TOUR_STEPS.filter((s) => s.key === wantKey);
     setTour({ steps: steps.length ? steps : TOUR_STEPS, index: 0 });
   };
 
@@ -483,8 +496,12 @@ function HelpWidget({ currentTabLabel, onStartTour }) {
         <div className="absolute right-0 top-12 min-w-[240px] overflow-hidden rounded-xl2 border border-line bg-white shadow-soft">
           <button className="block w-full border-b border-line/70 px-4 py-3 text-left text-sm font-semibold text-ink hover:bg-canvas"
             onClick={() => { setOpen(false); onStartTour("all"); }}>🔄 Volledige rondleiding</button>
-          <button className="block w-full px-4 py-3 text-left text-sm font-semibold text-ink hover:bg-canvas"
+          <button className="block w-full border-b border-line/70 px-4 py-3 text-left text-sm font-semibold text-ink hover:bg-canvas"
             onClick={() => { setOpen(false); onStartTour("current"); }}>📍 Uitleg over "{currentTabLabel}"</button>
+          <button className="block w-full border-b border-line/70 px-4 py-3 text-left text-sm font-semibold text-ink hover:bg-canvas"
+            onClick={() => { setOpen(false); onStartTour("invite"); }}>👥 Partner uitnodigen</button>
+          <button className="block w-full px-4 py-3 text-left text-sm font-semibold text-ink hover:bg-canvas"
+            onClick={() => { setOpen(false); onStartTour("backup"); }}>☁️ Back-up &amp; Google Sheets</button>
         </div>
       )}
       <button onClick={() => setOpen((o) => !o)} title="Rondleiding / hulp"
