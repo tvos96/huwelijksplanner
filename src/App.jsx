@@ -384,8 +384,8 @@ function Overview({ data, setData, set, editSettings, setEditSettings, go }) {
   const [quickDate, setQuickDate] = useState("");
   useEffect(() => setDraft(s), [editSettings]);
 
-  const coming = data.guests.reduce((a, x) => a + (x.rsvp === "yes" ? (Number(x.count) || 0) : 0), 0);
-  const invited = data.guests.reduce((a, x) => a + (Number(x.count) || 0), 0);
+  const coming = data.guests.filter((x) => x.rsvp === "yes").length;
+  const invited = data.guests.length;
   const vOpen = data.venues.filter((v) => v.status !== "rejected").length;
   const vFav = data.venues.filter((v) => v.fav).length;
   const savedPct = data.budget.total ? Math.round(data.budget.saved / data.budget.total * 100) : 0;
@@ -473,11 +473,11 @@ function Guests({ data, setData }) {
   const [flt, setFlt] = useState("alle");
   const g = data.guests;
   const shown = g.filter((x) => flt === "alle" || x.side === flt);
-  const coming = g.reduce((a, x) => a + (x.rsvp === "yes" ? (Number(x.count) || 0) : 0), 0);
-  const invited = g.reduce((a, x) => a + (Number(x.count) || 0), 0);
+  const coming = g.filter((x) => x.rsvp === "yes").length;
+  const invited = g.length;
   const pending = g.filter((x) => x.rsvp === "pending").length;
   const upd = (id, f, v) => setData((d) => ({ ...d, guests: d.guests.map((x) => x.id === id ? { ...x, [f]: v } : x) }));
-  const add = () => setData((d) => ({ ...d, guests: [{ id: uid(), name: "Nieuwe gast", count: 1, rsvp: "pending", diet: "", rel: "", side: "Tim", note: "" }, ...d.guests] }));
+  const add = () => setData((d) => ({ ...d, guests: [{ id: uid(), name: "Nieuwe gast", rsvp: "pending", diet: "", rel: "", side: "Tim", note: "" }, ...d.guests] }));
   const del = (id) => setData((d) => ({ ...d, guests: d.guests.filter((x) => x.id !== id) }));
 
   return (
@@ -503,10 +503,9 @@ function Guests({ data, setData }) {
           <CardContent className="pt-4">
             <div className="flex items-center gap-2">
               <Input className="flex-1 font-semibold" value={x.name} onChange={(e) => upd(x.id, "name", e.target.value)} />
-              <Input type="number" min="0" className="w-16" value={x.count} onChange={(e) => upd(x.id, "count", e.target.value)} />
               <IconBtn label="Verwijderen" onClick={() => del(x.id)}><X size={18} /></IconBtn>
             </div>
-            {x.rel && <div className="mt-1 text-xs text-muted">{x.rel}</div>}
+            <Input className="mt-2" placeholder="Relatie tot bruid & bruidegom" value={x.rel} onChange={(e) => upd(x.id, "rel", e.target.value)} />
             <div className="mt-2 flex gap-2">
               <Pill tone="indigo" active={x.rsvp === "yes"} onClick={() => upd(x.id, "rsvp", "yes")}>Komt</Pill>
               <Pill tone="rose" active={x.rsvp === "no"} onClick={() => upd(x.id, "rsvp", "no")}>Komt niet</Pill>

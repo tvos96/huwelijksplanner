@@ -25,9 +25,9 @@ const TONE_RGB = {
 const SHEET_DEFS = [
   {
     name: "Gasten", tone: "indigo",
-    headers: ["Naam", "Aantal", "Status", "Relatie", "Kant", "Notitie"],
+    headers: ["Naam", "Status", "Relatie", "Kant", "Notitie"],
     rows: (data) => (data.guests || []).map((g) => [
-      g.name || "", Number(g.count) || 0, RSVP_LABEL[g.rsvp] || "Onbekend", g.rel || "", g.side || "", g.diet || "",
+      g.name || "", RSVP_LABEL[g.rsvp] || "Onbekend", g.rel || "", g.side || "", g.diet || "",
     ]),
   },
   {

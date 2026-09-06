@@ -62,14 +62,13 @@ export async function exportExcel(data, filename) {
     tone: "indigo",
     columns: [
       { header: "Naam", key: "name", width: 26 },
-      { header: "Aantal", key: "count", width: 10 },
       { header: "Status", key: "status", width: 14 },
       { header: "Relatie", key: "rel", width: 18 },
       { header: "Kant", key: "side", width: 12 },
       { header: "Notitie", key: "note", width: 30 },
     ],
     rows: (data.guests || []).map((g) => ({
-      name: g.name || "", count: Number(g.count) || 0, status: RSVP_LABEL[g.rsvp] || "Onbekend",
+      name: g.name || "", status: RSVP_LABEL[g.rsvp] || "Onbekend",
       rel: g.rel || "", side: g.side || "", note: g.diet || "",
     })),
   });
@@ -176,11 +175,10 @@ export async function importExcel(file) {
     out.guests = guestRows.slice(1).filter((r) => (r[0] || "").toString().trim()).map((r) => ({
       id: uid(),
       name: String(r[0] || "").trim(),
-      count: Number(r[1]) || 1,
-      rsvp: RSVP_FROM_LABEL[String(r[2] || "").trim().toLowerCase()] || "pending",
-      rel: String(r[3] || ""),
-      side: String(r[4] || ""),
-      diet: String(r[5] || ""),
+      rsvp: RSVP_FROM_LABEL[String(r[1] || "").trim().toLowerCase()] || "pending",
+      rel: String(r[2] || ""),
+      side: String(r[3] || ""),
+      diet: String(r[4] || ""),
     }));
   }
 
