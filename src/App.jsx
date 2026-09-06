@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useMemo } from "react";
 import { createPortal } from "react-dom";
 import {
   Heart, Users, MapPin, Wallet, CheckSquare, Star, X, Plus, ExternalLink, Check,
-  Contact, Cloud, Trash2, ChevronLeft, ChevronRight, Phone, Mail, Play,
+  Contact, Cloud, Trash2, ChevronLeft, ChevronRight, Phone, Mail, Play, HelpCircle,
 } from "lucide-react";
 import { cn } from "./lib/utils";
 import { Button } from "./components/ui/button";
@@ -19,6 +19,46 @@ import { createLiveSheet, shareLiveSheet, pushToLiveSheet } from "./lib/sheetsSy
 
 /* ---------- opslag: live gedeeld via Firebase, met localStorage als terugval ---------- */
 const STORE_KEY = "wedding-planner-tim-ita-v2";
+const TOUR_SEEN_KEY = "wedding-planner-tour-seen-v1";
+
+/* ---------- rondleiding: één stap per onderdeel, plus een afsluitende stap ---------- */
+const TOUR_STEPS = [
+  {
+    tab: "overzicht",
+    title: "Welkom bij jullie huwelijksplanner!",
+    text: "Hier zien jullie in één oogopslag de belangrijkste cijfers en stellen jullie de trouwdatum en basisgegevens in. Alles wat je verderop ziet — budgetcategorieën, een taken-checklist, een dagplanning — is een voorbeeld om mee te starten. Pas gerust alles aan, verwijder wat niet van toepassing is en voeg toe wat jullie nodig hebben.",
+  },
+  {
+    tab: "gasten",
+    title: "Gasten",
+    text: "Houd hier bij wie er komt. Voeg per gast een naam toe, kies de kant (bruid of bruidegom) en de relatie, en volg de RSVP-status bij.",
+  },
+  {
+    tab: "locaties",
+    title: "Locaties",
+    text: "Verzamel hier trouwlocaties die jullie overwegen. Plak een Google Maps-link of gewoon de website van de locatie, en de app haalt automatisch adres, telefoon en beoordeling op.",
+  },
+  {
+    tab: "budget",
+    title: "Budget",
+    text: "Een voorbeeldverdeling in categorieën staat klaar op € 0 — vul jullie eigen begroting en gespaarde bedrag in, en voeg gerust eigen categorieën toe of verwijder wat niet nodig is.",
+  },
+  {
+    tab: "taken",
+    title: "Taken",
+    text: "Een standaard trouw-checklist om mee te beginnen. Vink af wat klaar is, verwijder wat niet van toepassing is en voeg jullie eigen taken toe.",
+  },
+  {
+    tab: "contacten",
+    title: "Contacten",
+    text: "Houd hier leveranciers bij — fotograaf, cateraar, DJ, en zo verder. Ook hier kun je gegevens automatisch laten ophalen via een Google Maps-link of website.",
+  },
+  {
+    tab: "overzicht",
+    title: "Nog vragen?",
+    text: "Klik op het vraagteken rechtsboven om deze rondleiding (of alleen het onderdeel waar je nu bent) nog eens te bekijken. Linksboven zie je wie er toegang heeft en kun je je partner uitnodigen; rechtsboven (het wolkje) maak je een back-up of exporteer je naar Excel of Google Sheets.",
+  },
+];
 
 const uid = () => Math.random().toString(36).slice(2, 9);
 
@@ -200,6 +240,8 @@ export default function WeddingPlanner({ weddingId }) {
   const [tab, setTab] = useState("overzicht");
   const [editSettings, setEditSettings] = useState(false);
   const [resetOpen, setResetOpen] = useState(false);
+  const [tour, setTour] = useState(null); // null | { steps, index }
+  const triedAutoTour = useRef(false);
   const ready = useRef(false);
   const applyingRemote = useRef(false);
 
@@ -226,6 +268,15 @@ export default function WeddingPlanner({ weddingId }) {
       }
       if (cancelled) return;
       setData(initial ? migrateData(JSON.parse(initial)) : defaultData());
+      if (!triedAutoTour.current) {
+        triedAutoTour.current = true;
+        let seenTour = null;
+        try { seenTour = localStorage.getItem(TOUR_SEEN_KEY); } catch { seenTour = null; }
+        if (!seenTour) {
+          setTour({ steps: TOUR_STEPS, index: 0 });
+          try { localStorage.setItem(TOUR_SEEN_KEY, "1"); } catch {}
+        }
+      }
       ready.current = true;
       if (store) {
         try {
@@ -311,11 +362,24 @@ export default function WeddingPlanner({ weddingId }) {
   const set = (patch) => setData((d) => ({ ...d, ...patch }));
   const days = daysUntil(data.settings.date);
   const tabs = [["overzicht", "Overzicht", Heart], ["gasten", "Gasten", Users], ["locaties", "Locaties", MapPin], ["budget", "Budget", Wallet], ["taken", "Taken", CheckSquare], ["contacten", "Contacten", Contact]];
+  const currentTabLabel = (tabs.find(([k]) => k === tab) || [, ""])[1];
+  const startTour = (scope) => {
+    if (scope === "all") { setTour({ steps: TOUR_STEPS, index: 0 }); return; }
+    const wantTab = scope === "current" ? tab : scope;
+    const steps = TOUR_STEPS.filter((s) => s.tab === wantTab);
+    setTour({ steps: steps.length ? steps : TOUR_STEPS, index: 0 });
+  };
 
   return (
     <div className="min-h-screen bg-canvas pb-28">
       <BackupWidget data={data} setData={setData}
         sheetLink={sheetLink} sheetConnected={!!sheetToken} sheetBusy={sheetBusy} sheetError={sheetError} onConnectSheet={connectSheet} />
+      <HelpWidget currentTabLabel={currentTabLabel} onStartTour={startTour} />
+      {tour && (
+        <Tour steps={tour.steps} stepIndex={tour.index}
+          setStepIndex={(fn) => setTour((t) => ({ ...t, index: typeof fn === "function" ? fn(t.index) : fn }))}
+          onClose={() => setTour(null)} onTabChange={setTab} />
+      )}
       <div className="mx-auto max-w-[780px] px-4 pt-7">
         <header className="text-center pb-5">
           <img src={MONO} className="h-16 mx-auto" alt="Logo Huwelijksplanner" />
@@ -367,6 +431,66 @@ export default function WeddingPlanner({ weddingId }) {
           }}
         />
       )}
+    </div>
+  );
+}
+
+/* ---------------- Rondleiding ---------------- */
+function Tour({ steps, stepIndex, setStepIndex, onClose, onTabChange }) {
+  useEffect(() => {
+    const s = steps[stepIndex];
+    if (s && s.tab) onTabChange(s.tab);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stepIndex]);
+
+  if (!steps.length) return null;
+  const s = steps[stepIndex];
+  const last = stepIndex === steps.length - 1;
+
+  return createPortal((
+    <div className="fixed inset-0 z-[900] flex items-end justify-center bg-black/40 px-4 pb-8 sm:items-center"
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="w-full max-w-[400px] rounded-2xl bg-white p-5 shadow-lift">
+        <div className="flex items-center justify-between">
+          <div className="text-[11px] font-semibold uppercase tracking-wider text-muted">Stap {stepIndex + 1} van {steps.length}</div>
+          <IconBtn label="Sluiten" onClick={onClose}><X size={18} /></IconBtn>
+        </div>
+        <h3 className="mt-1 text-lg font-bold text-ink">{s.title}</h3>
+        <p className="mt-1.5 text-[15px] leading-relaxed text-muted">{s.text}</p>
+        {steps.length > 1 && (
+          <div className="mt-4 flex items-center justify-center gap-1.5">
+            {steps.map((_, i) => <span key={i} className={cn("h-1.5 w-1.5 rounded-full", i === stepIndex ? "bg-indigo" : "bg-line")} />)}
+          </div>
+        )}
+        <div className="mt-4 flex gap-2">
+          {stepIndex > 0 && <Button variant="outline" size="sm" className="flex-1" onClick={() => setStepIndex((i) => i - 1)}>Vorige</Button>}
+          <Button size="sm" className="flex-1" onClick={() => last ? onClose() : setStepIndex((i) => i + 1)}>{last ? "Klaar" : "Volgende"}</Button>
+        </div>
+        {stepIndex === 0 && steps.length > 1 && (
+          <button className="mt-3 w-full text-center text-xs font-semibold text-muted underline" onClick={onClose}>Sla de rondleiding over</button>
+        )}
+      </div>
+    </div>
+  ), document.body);
+}
+
+/* ---------------- Vraagteken: rondleiding opnieuw starten ---------------- */
+function HelpWidget({ currentTabLabel, onStartTour }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="fixed right-3 z-[800]" style={{ top: "calc(56px + env(safe-area-inset-top))" }}>
+      {open && (
+        <div className="absolute right-0 top-12 min-w-[240px] overflow-hidden rounded-xl2 border border-line bg-white shadow-soft">
+          <button className="block w-full border-b border-line/70 px-4 py-3 text-left text-sm font-semibold text-ink hover:bg-canvas"
+            onClick={() => { setOpen(false); onStartTour("all"); }}>🔄 Volledige rondleiding</button>
+          <button className="block w-full px-4 py-3 text-left text-sm font-semibold text-ink hover:bg-canvas"
+            onClick={() => { setOpen(false); onStartTour("current"); }}>📍 Uitleg over "{currentTabLabel}"</button>
+        </div>
+      )}
+      <button onClick={() => setOpen((o) => !o)} title="Rondleiding / hulp"
+        className="flex h-10 w-10 items-center justify-center rounded-full border border-line bg-white text-amber shadow-soft opacity-85 hover:opacity-100">
+        <HelpCircle size={18} />
+      </button>
     </div>
   );
 }
