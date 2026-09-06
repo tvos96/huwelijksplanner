@@ -12,3 +12,9 @@ export const Textarea = React.forwardRef(({ className, ...p }, ref) => (
     className)} {...p} />
 ));
 Textarea.displayName = "Textarea";
+export const Select = React.forwardRef(({ className, children, ...p }, ref) => (
+  <select ref={ref} className={cn(
+    "w-full rounded-lg border border-line bg-canvas px-3 py-2 text-[15px] text-ink focus:outline-none focus:ring-2 focus:ring-indigo/30 focus:border-indigo",
+    className)} {...p}>{children}</select>
+));
+Select.displayName = "Select";

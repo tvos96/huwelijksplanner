@@ -8,9 +8,10 @@ import { cn } from "./lib/utils";
 import { Button } from "./components/ui/button";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "./components/ui/card";
 import { Badge } from "./components/ui/badge";
-import { Input, Textarea } from "./components/ui/input";
+import { Input, Textarea, Select } from "./components/ui/input";
 import { Progress } from "./components/ui/progress";
 import { MONO, COUPLE_COLOR, COUPLE_EMPTY, VENUE_COORDS, VENUE_ADDR } from "./data";
+import { RELATION_TYPES, SIDE_OPTIONS, parseRelationText } from "./lib/guestRelation";
 import { createWeddingStore, syncAvailable } from "./lib/plannerStore";
 import { exportExcel, importExcel } from "./lib/excel";
 import { listMembers, connectGoogleSheets, getGoogleAccessToken, onGoogleAccessTokenChange, authErrorMessage } from "./lib/weddingAuth";
@@ -66,6 +67,22 @@ export const defaultData = ({ partnerA = "", partnerB = "" } = {}) => ({
     { id: uid(), label: "Openingsdans oefenen", done: false },
   ],
 });
+
+/* ---------- eenmalige migratie: oude vrije-tekst "rel" -> relType/relOther ---------- */
+function migrateGuest(g) {
+  if (g.relType !== undefined) {
+    if (g.rel === undefined && g.count === undefined) return g;
+    const { rel, count, ...rest } = g;
+    return rest;
+  }
+  const { relType, relOther } = parseRelationText(g.rel);
+  const { rel, count, ...rest } = g;
+  return { ...rest, relType, relOther };
+}
+function migrateData(d) {
+  if (!d || !Array.isArray(d.guests)) return d;
+  return { ...d, guests: d.guests.map(migrateGuest) };
+}
 
 /* ---------- helpers ---------- */
 const euro = (n) => "€ " + (Number(n) || 0).toLocaleString("nl-NL", { maximumFractionDigits: 0 });
@@ -207,13 +224,13 @@ export default function WeddingPlanner({ weddingId }) {
         initial = cached;
       }
       if (cancelled) return;
-      setData(initial ? JSON.parse(initial) : defaultData());
+      setData(initial ? migrateData(JSON.parse(initial)) : defaultData());
       ready.current = true;
       if (store) {
         try {
           unsub = store.subscribe((json) => {
             applyingRemote.current = true;
-            setData(json ? JSON.parse(json) : defaultData());
+            setData(json ? migrateData(JSON.parse(json)) : defaultData());
           });
         } catch (e) { console.error("Live-sync kon niet starten:", e); }
       }
@@ -477,7 +494,7 @@ function Guests({ data, setData }) {
   const invited = g.length;
   const pending = g.filter((x) => x.rsvp === "pending").length;
   const upd = (id, f, v) => setData((d) => ({ ...d, guests: d.guests.map((x) => x.id === id ? { ...x, [f]: v } : x) }));
-  const add = () => setData((d) => ({ ...d, guests: [{ id: uid(), name: "Nieuwe gast", rsvp: "pending", diet: "", rel: "", side: "Tim", note: "" }, ...d.guests] }));
+  const add = () => setData((d) => ({ ...d, guests: [{ id: uid(), name: "Nieuwe gast", rsvp: "pending", diet: "", side: "Tim", relType: "", relOther: "", note: "" }, ...d.guests] }));
   const del = (id) => setData((d) => ({ ...d, guests: d.guests.filter((x) => x.id !== id) }));
 
   return (
@@ -505,7 +522,19 @@ function Guests({ data, setData }) {
               <Input className="flex-1 font-semibold" value={x.name} onChange={(e) => upd(x.id, "name", e.target.value)} />
               <IconBtn label="Verwijderen" onClick={() => del(x.id)}><X size={18} /></IconBtn>
             </div>
-            <Input className="mt-2" placeholder="Relatie tot bruid & bruidegom" value={x.rel} onChange={(e) => upd(x.id, "rel", e.target.value)} />
+            <div className="mt-2 grid grid-cols-2 gap-2">
+              <Select value={x.side} onChange={(e) => upd(x.id, "side", e.target.value)}>
+                {SIDE_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+              </Select>
+              <Select value={x.relType} onChange={(e) => upd(x.id, "relType", e.target.value)}>
+                <option value="">Relatie kiezen…</option>
+                {RELATION_TYPES.map((r) => <option key={r} value={r}>{r}</option>)}
+                <option value="Overig">Overig (zelf invullen)</option>
+              </Select>
+            </div>
+            {x.relType === "Overig" && (
+              <Input className="mt-2" placeholder="Welke relatie?" value={x.relOther} onChange={(e) => upd(x.id, "relOther", e.target.value)} />
+            )}
             <div className="mt-2 flex gap-2">
               <Pill tone="indigo" active={x.rsvp === "yes"} onClick={() => upd(x.id, "rsvp", "yes")}>Komt</Pill>
               <Pill tone="rose" active={x.rsvp === "no"} onClick={() => upd(x.id, "rsvp", "no")}>Komt niet</Pill>

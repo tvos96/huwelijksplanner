@@ -1,4 +1,5 @@
 import * as XLSX from "xlsx";
+import { parseRelationText, resolveRelationText } from "./guestRelation";
 
 const uid = () => Math.random().toString(36).slice(2, 9);
 
@@ -69,7 +70,7 @@ export async function exportExcel(data, filename) {
     ],
     rows: (data.guests || []).map((g) => ({
       name: g.name || "", status: RSVP_LABEL[g.rsvp] || "Onbekend",
-      rel: g.rel || "", side: g.side || "", note: g.diet || "",
+      rel: resolveRelationText(g), side: g.side || "", note: g.diet || "",
     })),
   });
 
@@ -172,14 +173,17 @@ export async function importExcel(file) {
 
   const guestRows = sheetToRows(wb, "Gasten");
   if (guestRows && guestRows.length > 1) {
-    out.guests = guestRows.slice(1).filter((r) => (r[0] || "").toString().trim()).map((r) => ({
-      id: uid(),
-      name: String(r[0] || "").trim(),
-      rsvp: RSVP_FROM_LABEL[String(r[1] || "").trim().toLowerCase()] || "pending",
-      rel: String(r[2] || ""),
-      side: String(r[3] || ""),
-      diet: String(r[4] || ""),
-    }));
+    out.guests = guestRows.slice(1).filter((r) => (r[0] || "").toString().trim()).map((r) => {
+      const { relType, relOther } = parseRelationText(r[2]);
+      return {
+        id: uid(),
+        name: String(r[0] || "").trim(),
+        rsvp: RSVP_FROM_LABEL[String(r[1] || "").trim().toLowerCase()] || "pending",
+        relType, relOther,
+        side: String(r[3] || "") || "Tim",
+        diet: String(r[4] || ""),
+      };
+    });
   }
 
   const venueRows = sheetToRows(wb, "Locaties");

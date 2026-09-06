@@ -8,6 +8,8 @@
 // alleen bestanden die deze app zelf aanmaakt — geen toegang tot de rest
 // van iemands Drive).
 
+import { resolveRelationText } from "./guestRelation";
+
 const SHEETS_API = "https://sheets.googleapis.com/v4/spreadsheets";
 const DRIVE_API = "https://www.googleapis.com/drive/v3/files";
 
@@ -27,7 +29,7 @@ const SHEET_DEFS = [
     name: "Gasten", tone: "indigo",
     headers: ["Naam", "Status", "Relatie", "Kant", "Notitie"],
     rows: (data) => (data.guests || []).map((g) => [
-      g.name || "", RSVP_LABEL[g.rsvp] || "Onbekend", g.rel || "", g.side || "", g.diet || "",
+      g.name || "", RSVP_LABEL[g.rsvp] || "Onbekend", resolveRelationText(g), g.side || "", g.diet || "",
     ]),
   },
   {
