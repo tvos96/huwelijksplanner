@@ -1,9 +1,10 @@
 // Cloudflare Pages Function: haalt zoveel mogelijk informatie op over een
 // leverancier/contact, op basis van een Google Maps-link en/of een
 // website-URL. Gebruikt dezelfde Google Places API als de locaties-autofetch
-// (place.js) voor naam, adres, telefoon en website, en leest daarnaast de
-// website zelf uit (titel, meta-omschrijving, telefoon/e-mail op de pagina)
-// om hiaten aan te vullen en een rol (fotograaf, cateraar, ...) te raden.
+// (place.js) voor naam, adres, telefoon, website en beoordeling, en leest
+// daarnaast de website zelf uit (titel, meta-omschrijving, telefoon/e-mail op
+// de pagina, Instagram-link) om hiaten aan te vullen en een rol (fotograaf,
+// cateraar, ...) te raden.
 //
 // Vereist dezelfde omgevingsvariabele als place.js: GOOGLE_MAPS_API_KEY.
 // Dit is de Cloudflare-versie van de vroegere Netlify Function met dezelfde
@@ -73,7 +74,7 @@ async function lookupMaps(link, KEY) {
   if (!placeId) return null;
 
   const d = await (await fetch(
-    `https://maps.googleapis.com/maps/api/place/details/json?place_id=${placeId}&fields=name,formatted_address,formatted_phone_number,international_phone_number,address_component,website,type&language=nl&key=${KEY}`
+    `https://maps.googleapis.com/maps/api/place/details/json?place_id=${placeId}&fields=name,formatted_address,formatted_phone_number,international_phone_number,address_component,website,type,rating,user_ratings_total,business_status&language=nl&key=${KEY}`
   )).json();
   const r = d.result || {};
   const comp = r.address_components || [];
@@ -89,6 +90,9 @@ async function lookupMaps(link, KEY) {
     website: r.website || "",
     phone: r.formatted_phone_number || r.international_phone_number || "",
     role: role || guessRole((r.name || "") + " " + types.join(" ")),
+    rating: r.rating != null ? r.rating : null,
+    userRatingsTotal: r.user_ratings_total != null ? r.user_ratings_total : null,
+    businessStatus: r.business_status || "",
   };
 }
 
@@ -102,6 +106,7 @@ async function scrapeWebsite(url) {
   const descM = html.match(/<meta[^>]+name=["']description["'][^>]+content=["']([^"']*)["']/i);
   const emailM = html.match(/mailto:([^"'?<>\s]+)/i);
   const telM = html.match(/tel:([+\d][\d\s().-]{6,}\d)/i) || html.match(/(\+?\d[\d\s().-]{7,}\d)/);
+  const instaM = html.match(/https?:\/\/(?:www\.)?instagram\.com\/[a-zA-Z0-9_.]+/i);
 
   const title = (ogSiteM && ogSiteM[1]) || (titleM && titleM[1]) || "";
   const desc = (descM && descM[1]) || "";
@@ -110,6 +115,7 @@ async function scrapeWebsite(url) {
     name: title.split(/[|·\-–]/)[0].trim(),
     email: emailM ? emailM[1] : "",
     phone: telM ? telM[1].trim() : "",
+    instagram: instaM ? instaM[0].split(/[?#]/)[0] : "",
     role: guessRole(title + " " + desc + " " + full),
   };
 }
@@ -142,6 +148,10 @@ export async function onRequestGet(context) {
     email: (fromSite && fromSite.email) || "",
     website: website || (fromMaps && fromMaps.website) || "",
     address: (fromMaps && fromMaps.address) || "",
+    instagram: (fromSite && fromSite.instagram) || "",
+    rating: (fromMaps && fromMaps.rating != null) ? fromMaps.rating : null,
+    userRatingsTotal: (fromMaps && fromMaps.userRatingsTotal != null) ? fromMaps.userRatingsTotal : null,
+    businessStatus: (fromMaps && fromMaps.businessStatus) || "",
   };
   return json(200, out);
 }

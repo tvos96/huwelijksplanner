@@ -429,7 +429,14 @@ function Overview({ data, setData, set, editSettings, setEditSettings, go }) {
             <div className="grid gap-2">
               <div><FieldLabel>Naam 1</FieldLabel><Input value={draft.partnerA} onChange={(e) => setDraft({ ...draft, partnerA: e.target.value })} /></div>
               <div><FieldLabel>Naam 2</FieldLabel><Input value={draft.partnerB} onChange={(e) => setDraft({ ...draft, partnerB: e.target.value })} /></div>
-              <div><FieldLabel>Trouwdatum</FieldLabel><Input type="date" value={draft.date} onChange={(e) => setDraft({ ...draft, date: e.target.value })} /></div>
+              <div>
+                <FieldLabel>Trouwdatum</FieldLabel>
+                <div className="flex items-center gap-2">
+                  <Input type="date" className="flex-1" value={draft.date} onChange={(e) => setDraft({ ...draft, date: e.target.value })} />
+                  {draft.date && <IconBtn label="Datum wissen" onClick={() => setDraft({ ...draft, date: "" })}><X size={18} /></IconBtn>}
+                </div>
+                {draft.date === "" && s.date !== "" && <p className="mt-1 text-xs text-muted">Bewaar om de datum weer op "nog te prikken" te zetten.</p>}
+              </div>
               <div><FieldLabel>Locatie (optioneel)</FieldLabel><Input value={draft.location} onChange={(e) => setDraft({ ...draft, location: e.target.value })} /></div>
               <div className="mt-2 flex gap-2">
                 <Button onClick={() => { set({ settings: draft }); setEditSettings(false); }}>Bewaren</Button>
@@ -523,26 +530,39 @@ function Venues({ data, setData }) {
   const list = [...v].sort((a, b) => rank(a) - rank(b));
   const shown = list.filter((x) => flt === "alle" || (flt === "intr" && x.status !== "rejected") || (flt === "rej" && x.status === "rejected") || (flt === "fav" && x.fav));
   const upd = (id, f, val) => setData((d) => ({ ...d, venues: d.venues.map((x) => x.id === id ? { ...x, [f]: val } : x) }));
-  const addVenue = (obj) => setData((d) => ({ ...d, venues: [{ id: uid(), name: "Nieuwe locatie", country: "", place: "", province: "", address: "", web: "", ita: "", tim: "", status: "open", fav: false, coords: "", ...obj }, ...d.venues] }));
+  const addVenue = (obj) => setData((d) => ({ ...d, venues: [{ id: uid(), name: "Nieuwe locatie", country: "", place: "", province: "", address: "", web: "", phone: "", rating: "", businessStatus: "", ita: "", tim: "", status: "open", fav: false, coords: "", ...obj }, ...d.venues] }));
   const add = () => addVenue({});
   const del = (id) => setData((d) => ({ ...d, venues: d.venues.filter((x) => x.id !== id) }));
 
   const addFromLink = async () => {
     const url = link.trim(); if (!url) return; setLoading(true);
+    const maps = isMapsUrl(url);
     try {
-      const res = await fetch("/api/place?link=" + encodeURIComponent(url));
+      const param = maps ? "link=" + encodeURIComponent(url) : "website=" + encodeURIComponent(url);
+      const res = await fetch("/api/place?" + param);
       if (res.ok) {
         const d = await res.json();
         if (!d.error) {
-          addVenue({ name: d.name || parseMapsName(url) || "Nieuwe locatie", place: d.place || "", province: d.province || "", country: d.country || "", address: d.address || "", web: d.website || "", coords: (d.lat != null && d.lng != null) ? (d.lat + ", " + d.lng) : url });
+          addVenue({
+            name: d.name || (maps ? parseMapsName(url) : "") || "Nieuwe locatie",
+            place: d.place || "", province: d.province || "", country: d.country || "",
+            address: d.address || "", web: d.website || (maps ? "" : url),
+            phone: d.phone || "",
+            rating: d.rating != null ? (Number(d.rating).toFixed(1) + (d.userRatingsTotal ? " (" + d.userRatingsTotal + " reviews)" : "")) : "",
+            businessStatus: d.businessStatus || "",
+            coords: (d.lat != null && d.lng != null) ? (d.lat + ", " + d.lng) : (maps ? url : ""),
+          });
           setLink(""); setLoading(false); return;
         }
       }
-    } catch (e) { /* val terug op lokaal uitlezen */ }
-    if (isShortMapsLink(url)) { setLoading(false); alert("Dit is een verkorte deellink. De automatische ophaalfunctie is nog niet actief. Kopieer de link uit de adresbalk van Google Maps, of plak coördinaten (52.09, 4.88)."); return; }
-    const c = parseLatLng(url); const nm = parseMapsName(url);
-    if (!c && !nm) { setLoading(false); alert("Kon geen locatie uit deze link halen. Plak de volledige Google Maps-link, of coördinaten (52.09, 4.88)."); return; }
-    addVenue({ name: nm || "Nieuwe locatie", coords: url }); setLink(""); setLoading(false);
+    } catch (e) { /* val terug op lokaal uitlezen, alleen mogelijk bij een Maps-link */ }
+    if (maps) {
+      if (isShortMapsLink(url)) { setLoading(false); alert("Dit is een verkorte deellink. De automatische ophaalfunctie is nog niet actief. Kopieer de link uit de adresbalk van Google Maps, of plak coördinaten (52.09, 4.88)."); return; }
+      const c = parseLatLng(url); const nm = parseMapsName(url);
+      if (!c && !nm) { setLoading(false); alert("Kon geen locatie uit deze link halen. Plak de volledige Google Maps-link, of coördinaten (52.09, 4.88)."); return; }
+      addVenue({ name: nm || "Nieuwe locatie", coords: url }); setLink(""); setLoading(false); return;
+    }
+    setLoading(false); alert("Kon geen informatie ophalen van deze website. Voeg de locatie handmatig toe.");
   };
 
   return (
@@ -571,10 +591,10 @@ function Venues({ data, setData }) {
       </Card>
 
       <Card>
-        <CardHeader><CardTitle>Locatie toevoegen</CardTitle><CardDescription>Plak een Google Maps-link — naam, adres, plaats, provincie en website worden automatisch opgehaald.</CardDescription></CardHeader>
+        <CardHeader><CardTitle>Locatie toevoegen</CardTitle><CardDescription>Plak een Google Maps-link of de website van de locatie — naam, adres, plaats, provincie, telefoon, website en beoordeling worden waar mogelijk automatisch opgehaald.</CardDescription></CardHeader>
         <CardContent>
           <div className="flex flex-wrap gap-2">
-            <Input className="min-w-[180px] flex-1" placeholder="Plak Google Maps-link of coördinaten" value={link} disabled={loading} onChange={(e) => setLink(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") addFromLink(); }} />
+            <Input className="min-w-[180px] flex-1" placeholder="Google Maps-link, coördinaten of website (https://...)" value={link} disabled={loading} onChange={(e) => setLink(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") addFromLink(); }} />
             <Button onClick={addFromLink} disabled={loading}>{loading ? "Ophalen…" : "Toevoegen via link"}</Button>
           </div>
           <div className="mt-2"><Button variant="ghost" size="sm" onClick={add}><Plus size={16} /> Handmatig toevoegen</Button></div>
@@ -596,6 +616,11 @@ function Venues({ data, setData }) {
               <Pill tone="indigo" active={x.status !== "rejected"} onClick={() => upd(x.id, "status", "open")}>Interessant</Pill>
               <Pill tone="rose" active={x.status === "rejected"} onClick={() => upd(x.id, "status", "rejected")}>Afgekruist</Pill>
             </div>
+            {x.businessStatus && x.businessStatus !== "OPERATIONAL" && (
+              <div className="mt-2 rounded-lg bg-rose-soft px-3 py-2 text-xs font-semibold text-rose-ink">
+                ⚠️ Volgens Google is deze locatie {x.businessStatus === "CLOSED_PERMANENTLY" ? "permanent gesloten" : "tijdelijk gesloten"}.
+              </div>
+            )}
             <FieldLabel>Opmerking Ita</FieldLabel>
             <Textarea placeholder="Wat vindt Ita ervan?" value={x.ita} onChange={(e) => upd(x.id, "ita", e.target.value)} />
             <FieldLabel>Opmerking Tim</FieldLabel>
@@ -606,12 +631,17 @@ function Venues({ data, setData }) {
               <div><FieldLabel>Plaats</FieldLabel><Input placeholder="Plaats" value={x.place || ""} onChange={(e) => upd(x.id, "place", e.target.value)} /></div>
               <div><FieldLabel>Website</FieldLabel><Input placeholder="https://..." value={x.web || ""} onChange={(e) => upd(x.id, "web", e.target.value)} /></div>
             </div>
+            <div className="mt-2 grid grid-cols-2 gap-2">
+              <div><FieldLabel>Telefoon</FieldLabel><Input type="tel" placeholder="06-... of 0..." value={x.phone || ""} onChange={(e) => upd(x.id, "phone", e.target.value)} /></div>
+              <div><FieldLabel>Beoordeling</FieldLabel><Input placeholder="bv. 4.6 (128 reviews)" value={x.rating || ""} onChange={(e) => upd(x.id, "rating", e.target.value)} /></div>
+            </div>
             <FieldLabel>Locatie op de kaart</FieldLabel>
             <Input placeholder="Google Maps-link of coördinaten (52.09, 4.88)" value={x.coords || ""} onChange={(e) => upd(x.id, "coords", e.target.value)} />
             <div className={cn("mt-1 text-xs", coordsOf(x) ? "text-indigo-ink" : "text-muted")}>{coordsOf(x) ? "✓ staat op de kaart" : "Nog niet op de kaart"}</div>
             <div className="mt-3 flex flex-wrap items-center gap-4">
               <a className="inline-flex items-center gap-1 text-sm text-indigo-ink underline" target="_blank" rel="noreferrer" href={"https://www.google.com/maps/search/?api=1&query=" + encodeURIComponent([x.name, x.place, x.country].filter(Boolean).join(" "))}><MapPin size={14} /> Op Google Maps</a>
               {x.web && isLink(x.web) && <a className="inline-flex items-center gap-1 text-sm text-indigo-ink underline" target="_blank" rel="noreferrer" href={x.web.startsWith("http") ? x.web : "https://" + x.web}><ExternalLink size={14} /> Website</a>}
+              {x.phone && <a className="inline-flex items-center gap-1 text-sm text-indigo-ink underline" href={"tel:" + (x.phone || "").replace(/\s/g, "")}><Phone size={14} /> Bellen</a>}
             </div>
           </CardContent>
         </Card>
@@ -724,7 +754,7 @@ function Vendors({ data, setData }) {
   const [loading, setLoading] = useState(false);
 
   const upd = (id, f, val) => setData((d) => ({ ...d, vendors: (d.vendors || []).map((x) => x.id === id ? { ...x, [f]: val } : x) }));
-  const addVendor = (obj) => setData((d) => ({ ...d, vendors: [{ id: uid(), name: "", role: "", phone: "", email: "", web: "", price: "", status: "", note: "", ...obj }, ...(d.vendors || [])] }));
+  const addVendor = (obj) => setData((d) => ({ ...d, vendors: [{ id: uid(), name: "", role: "", phone: "", email: "", web: "", address: "", rating: "", instagram: "", businessStatus: "", price: "", status: "", note: "", ...obj }, ...(d.vendors || [])] }));
   const add = (role) => addVendor({ role: role || "" });
   const del = (id) => setData((d) => ({ ...d, vendors: (d.vendors || []).filter((x) => x.id !== id) }));
   const booked = list.filter((x) => x.status === "geboekt").length;
@@ -742,7 +772,14 @@ function Vendors({ data, setData }) {
       const res = await fetch("/api/vendor?" + param);
       const d = await res.json();
       if (res.ok && !d.error) {
-        addVendor({ name: d.name || "Nieuw contact", role: d.role || "", phone: d.phone || "", email: d.email || "", web: d.website || (isMapsUrl(url) ? "" : url) });
+        addVendor({
+          name: d.name || "Nieuw contact", role: d.role || "", phone: d.phone || "", email: d.email || "",
+          web: d.website || (isMapsUrl(url) ? "" : url),
+          address: d.address || "",
+          rating: d.rating != null ? (Number(d.rating).toFixed(1) + (d.userRatingsTotal ? " (" + d.userRatingsTotal + " reviews)" : "")) : "",
+          instagram: d.instagram || "",
+          businessStatus: d.businessStatus || "",
+        });
         setLink(""); setLoading(false); return;
       }
       alert(d.error || "Kon geen informatie ophalen van deze link.");
@@ -771,7 +808,7 @@ function Vendors({ data, setData }) {
 
       <Card>
         <CardHeader><CardTitle>Contact toevoegen via link</CardTitle>
-          <CardDescription>Plak een Google Maps-link of de website van de leverancier — naam, rol, telefoon en e-mail worden waar mogelijk automatisch opgehaald.</CardDescription>
+          <CardDescription>Plak een Google Maps-link of de website van de leverancier — naam, rol, telefoon, e-mail, adres, website, beoordeling en Instagram worden waar mogelijk automatisch opgehaald.</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="flex flex-wrap gap-2">
@@ -804,20 +841,32 @@ function Vendors({ data, setData }) {
               <Pill tone="amber" active={x.status === "optie"} onClick={() => upd(x.id, "status", x.status === "optie" ? "" : "optie")}>Optie</Pill>
               <Pill tone="indigo" active={x.status === "geboekt"} onClick={() => upd(x.id, "status", x.status === "geboekt" ? "" : "geboekt")}>Geboekt</Pill>
             </div>
+            {x.businessStatus && x.businessStatus !== "OPERATIONAL" && (
+              <div className="mt-2 rounded-lg bg-rose-soft px-3 py-2 text-xs font-semibold text-rose-ink">
+                ⚠️ Volgens Google is dit bedrijf {x.businessStatus === "CLOSED_PERMANENTLY" ? "permanent gesloten" : "tijdelijk gesloten"}.
+              </div>
+            )}
             <div className="mt-2 grid grid-cols-2 gap-2">
               <div><FieldLabel>Telefoon</FieldLabel><Input type="tel" placeholder="06-..." value={x.phone || ""} onChange={(e) => upd(x.id, "phone", e.target.value)} /></div>
               <div><FieldLabel>Prijs</FieldLabel><Input placeholder="bv. € 2.500" value={x.price || ""} onChange={(e) => upd(x.id, "price", e.target.value)} /></div>
             </div>
             <FieldLabel>E-mail</FieldLabel>
             <Input type="email" placeholder="naam@bedrijf.nl" value={x.email || ""} onChange={(e) => upd(x.id, "email", e.target.value)} />
-            <FieldLabel>Website</FieldLabel>
-            <Input placeholder="https://..." value={x.web || ""} onChange={(e) => upd(x.id, "web", e.target.value)} />
+            <FieldLabel>Adres</FieldLabel>
+            <Input placeholder="Straat, postcode, plaats" value={x.address || ""} onChange={(e) => upd(x.id, "address", e.target.value)} />
+            <div className="mt-2 grid grid-cols-2 gap-2">
+              <div><FieldLabel>Website</FieldLabel><Input placeholder="https://..." value={x.web || ""} onChange={(e) => upd(x.id, "web", e.target.value)} /></div>
+              <div><FieldLabel>Instagram</FieldLabel><Input placeholder="https://instagram.com/..." value={x.instagram || ""} onChange={(e) => upd(x.id, "instagram", e.target.value)} /></div>
+            </div>
+            <FieldLabel>Beoordeling</FieldLabel>
+            <Input placeholder="bv. 4.8 (64 reviews)" value={x.rating || ""} onChange={(e) => upd(x.id, "rating", e.target.value)} />
             <FieldLabel>Notitie</FieldLabel>
             <Textarea placeholder="Afspraken, offertelink, etc." value={x.note || ""} onChange={(e) => upd(x.id, "note", e.target.value)} />
             <div className="mt-3 flex flex-wrap gap-4">
               {x.phone && <a className="inline-flex items-center gap-1 text-sm text-indigo-ink underline" href={"tel:" + (x.phone || "").replace(/\s/g, "")}><Phone size={14} /> Bellen</a>}
               {x.email && <a className="inline-flex items-center gap-1 text-sm text-indigo-ink underline" href={"mailto:" + x.email}><Mail size={14} /> Mailen</a>}
               {x.web && isLink(x.web) && <a className="inline-flex items-center gap-1 text-sm text-indigo-ink underline" target="_blank" rel="noreferrer" href={x.web.startsWith("http") ? x.web : "https://" + x.web}><ExternalLink size={14} /> Website</a>}
+              {x.instagram && isLink(x.instagram) && <a className="inline-flex items-center gap-1 text-sm text-indigo-ink underline" target="_blank" rel="noreferrer" href={x.instagram.startsWith("http") ? x.instagram : "https://" + x.instagram}><ExternalLink size={14} /> Instagram</a>}
             </div>
           </CardContent>
         </Card>
