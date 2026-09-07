@@ -418,7 +418,7 @@ export default function WeddingPlanner({ weddingId }) {
         {tab === "contacten" && <Vendors data={data} setData={setData} />}
 
         <div className="mt-8 text-center text-xs text-muted">
-          Gemaakt met liefde · <a className="underline" href="/privacy.html" target="_blank" rel="noreferrer">privacyverklaring</a> · <button className="underline" onClick={() => setResetOpen(true)}>opnieuw beginnen</button>
+          Gemaakt met liefde · <a className="underline" href="/privacy.html">privacyverklaring</a> · <button className="underline" onClick={() => setResetOpen(true)}>opnieuw beginnen</button>
         </div>
       </div>
 
