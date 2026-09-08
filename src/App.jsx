@@ -11,7 +11,7 @@ import { Badge } from "./components/ui/badge";
 import { Input, Textarea, Select } from "./components/ui/input";
 import { Progress } from "./components/ui/progress";
 import { MONO, COUPLE_COLOR, COUPLE_EMPTY, VENUE_COORDS, VENUE_ADDR } from "./data";
-import { RELATION_TYPES, SIDE_OPTIONS, parseRelationText, cleanupBareOverig } from "./lib/guestRelation";
+import { RELATION_TYPES, SIDE_OPTIONS, parseRelationText, cleanupBareOverig, countMailings, householdMates } from "./lib/guestRelation";
 import { createWeddingStore, syncAvailable } from "./lib/plannerStore";
 import { exportExcel, importExcel } from "./lib/excel";
 import { listMembers, connectGoogleSheets, getGoogleAccessToken, onGoogleAccessTokenChange, authErrorMessage } from "./lib/weddingAuth";
@@ -34,7 +34,7 @@ const TOUR_STEPS = [
   {
     key: "gasten", tab: "gasten",
     title: "Gasten",
-    text: "Houd hier bij wie er komt. Voeg per gast een naam toe, kies de kant (bruid of bruidegom) en de relatie, en volg de RSVP-status bij.",
+    text: "Houd hier bij wie er komt. Voeg per gast een naam toe, kies de kant (bruid of bruidegom) en de relatie, volg de RSVP-status bij en vul telefoon, e-mail en adres in voor de kaartjes. Wonen twee gasten samen? Geef ze hetzelfde 'huishouden' mee, dan tellen ze samen als 1 kaartje.",
   },
   {
     key: "locaties", tab: "locaties",
@@ -123,15 +123,20 @@ export const defaultData = ({ partnerA = "", partnerB = "" } = {}) => ({
 
 /* ---------- eenmalige migratie: oude vrije-tekst "rel" -> relType/relOther ---------- */
 function migrateGuest(g) {
+  let out;
   if (g.relType !== undefined) {
     const cleaned = cleanupBareOverig(g);
-    if (cleaned.rel === undefined && cleaned.count === undefined) return cleaned;
-    const { rel, count, ...rest } = cleaned;
-    return rest;
+    if (cleaned.rel === undefined && cleaned.count === undefined) out = cleaned;
+    else { const { rel, count, ...rest } = cleaned; out = rest; }
+  } else {
+    const { relType, relOther } = parseRelationText(g.rel);
+    const { rel, count, ...rest } = g;
+    out = { ...rest, relType, relOther };
   }
-  const { relType, relOther } = parseRelationText(g.rel);
-  const { rel, count, ...rest } = g;
-  return { ...rest, relType, relOther };
+  // Contactgegevens/huishouden zijn nieuwe velden; bestaande gasten kregen ze
+  // nog niet, dus altijd een lege string als basis zodat de inputs
+  // gecontroleerd blijven (geen "undefined").
+  return { email: "", phone: "", address: "", household: "", ...out };
 }
 function migrateData(d) {
   if (!d || !Array.isArray(d.guests)) return d;
@@ -635,8 +640,9 @@ function Guests({ data, setData }) {
   const coming = g.filter((x) => x.rsvp === "yes").length;
   const invited = g.length;
   const pending = g.filter((x) => x.rsvp === "pending").length;
+  const mailings = countMailings(g);
   const upd = (id, f, v) => setData((d) => ({ ...d, guests: d.guests.map((x) => x.id === id ? { ...x, [f]: v } : x) }));
-  const add = () => setData((d) => ({ ...d, guests: [{ id: uid(), name: "Nieuwe gast", rsvp: "pending", diet: "", side: "Tim", relType: "", relOther: "", note: "" }, ...d.guests] }));
+  const add = () => setData((d) => ({ ...d, guests: [{ id: uid(), name: "Nieuwe gast", rsvp: "pending", diet: "", side: "Tim", relType: "", relOther: "", note: "", email: "", phone: "", address: "", household: "" }, ...d.guests] }));
   const del = (id) => setData((d) => ({ ...d, guests: d.guests.filter((x) => x.id !== id) }));
 
   return (
@@ -644,10 +650,11 @@ function Guests({ data, setData }) {
       <Card>
         <CardHeader><CardTitle>Gasten</CardTitle><CardDescription>Wie komt er, en wie moet nog reageren?</CardDescription></CardHeader>
         <CardContent>
-          <div className="flex gap-6">
+          <div className="flex flex-wrap gap-6">
             <div><div className="text-2xl font-extrabold text-indigo-ink">{coming}</div><div className="text-xs text-muted">komen</div></div>
             <div><div className="text-2xl font-extrabold text-indigo-ink">{invited}</div><div className="text-xs text-muted">uitgenodigd</div></div>
             <div><div className="text-2xl font-extrabold text-amber-ink">{pending}</div><div className="text-xs text-muted">geen reactie</div></div>
+            <div><div className="text-2xl font-extrabold text-rose-ink">{mailings}</div><div className="text-xs text-muted">kaartjes te versturen</div></div>
           </div>
           <div className="mt-4 flex gap-2">
             {[["alle", "Iedereen"], ["Tim", "Tim"], ["Ita", "Ita"]].map(([k, l]) => <Pill key={k} tone="ink" active={flt === k} onClick={() => setFlt(k)}>{l}</Pill>)}
@@ -657,7 +664,10 @@ function Guests({ data, setData }) {
 
       <Button variant="outline" size="sm" onClick={add}><Plus size={16} /> Gast toevoegen</Button>
 
-      {shown.map((x) => (
+      {shown.map((x) => {
+        const mates = householdMates(x, g);
+        const mateWithAddress = mates.find((m) => (m.address || "").trim());
+        return (
         <Card key={x.id}>
           <CardContent className="pt-4">
             <div className="flex items-center gap-2">
@@ -683,9 +693,27 @@ function Guests({ data, setData }) {
               <Pill tone="amber" active={x.rsvp === "pending"} onClick={() => upd(x.id, "rsvp", "pending")}>Onbekend</Pill>
             </div>
             <Input className="mt-2" placeholder="Dieetwensen / notitie" value={x.diet} onChange={(e) => upd(x.id, "diet", e.target.value)} />
+
+            <div className="mt-3 grid grid-cols-2 gap-2">
+              <div><FieldLabel>Telefoon</FieldLabel><Input type="tel" placeholder="06-..." value={x.phone} onChange={(e) => upd(x.id, "phone", e.target.value)} /></div>
+              <div><FieldLabel>E-mail</FieldLabel><Input type="email" placeholder="naam@voorbeeld.nl" value={x.email} onChange={(e) => upd(x.id, "email", e.target.value)} /></div>
+            </div>
+            <FieldLabel>Adres (voor kaartjes/post)</FieldLabel>
+            <Input placeholder="Straat, postcode, plaats" value={x.address} onChange={(e) => upd(x.id, "address", e.target.value)} />
+            <FieldLabel>Huishouden</FieldLabel>
+            <Input placeholder="bv. 'Jan & Marie' — gasten met dezelfde tekst tellen als 1 kaartje" value={x.household} onChange={(e) => upd(x.id, "household", e.target.value)} />
+            {mates.length > 0 && (
+              <div className="mt-1 text-xs text-muted">
+                🏠 Zelfde huishouden als {mates.map((m) => m.name).join(", ")} — telt samen als 1 kaartje.
+                {!x.address && mateWithAddress && (
+                  <> <button type="button" className="underline text-indigo-ink" onClick={() => upd(x.id, "address", mateWithAddress.address)}>Adres overnemen</button></>
+                )}
+              </div>
+            )}
           </CardContent>
         </Card>
-      ))}
+        );
+      })}
     </div>
   );
 }

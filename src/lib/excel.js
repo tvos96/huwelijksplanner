@@ -67,10 +67,15 @@ export async function exportExcel(data, filename) {
       { header: "Relatie", key: "rel", width: 18 },
       { header: "Kant", key: "side", width: 12 },
       { header: "Notitie", key: "note", width: 30 },
+      { header: "Huishouden", key: "household", width: 18 },
+      { header: "Telefoon", key: "phone", width: 16 },
+      { header: "Email", key: "email", width: 24 },
+      { header: "Adres", key: "address", width: 30 },
     ],
     rows: (data.guests || []).map((g) => ({
       name: g.name || "", status: RSVP_LABEL[g.rsvp] || "Onbekend",
       rel: resolveRelationText(g), side: g.side || "", note: g.diet || "",
+      household: g.household || "", phone: g.phone || "", email: g.email || "", address: g.address || "",
     })),
   });
 
@@ -182,6 +187,10 @@ export async function importExcel(file) {
         relType, relOther,
         side: String(r[3] || "") || "Tim",
         diet: String(r[4] || ""),
+        household: String(r[5] || ""),
+        phone: String(r[6] || ""),
+        email: String(r[7] || ""),
+        address: String(r[8] || ""),
       };
     });
   }

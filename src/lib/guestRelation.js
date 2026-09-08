@@ -69,3 +69,33 @@ export function resolveRelationText(g) {
   if (g.relType === "Overig") return g.relOther || "Overig";
   return g.relType || "";
 }
+
+// Huishoudens: gasten die op hetzelfde adres wonen (bv. samenwonende
+// partners, een gezin) hoeven maar 1 kaartje te krijgen. Gasten met
+// hetzelfde "household"-label (ongeacht hoofdletters/spaties) horen bij
+// elkaar. Een leeg label betekent "geen huishouden gekoppeld" en telt altijd
+// als een eigen, individueel kaartje.
+export function householdKey(g) {
+  const k = String(g?.household || "").trim().toLowerCase();
+  return k || null;
+}
+
+// Aantal te versturen kaartjes: 1 per uniek huishouden + 1 per gast zonder
+// huishouden.
+export function countMailings(guests) {
+  const seen = new Set();
+  let n = 0;
+  for (const g of guests || []) {
+    const k = householdKey(g);
+    if (!k) { n += 1; continue; }
+    if (!seen.has(k)) { seen.add(k); n += 1; }
+  }
+  return n;
+}
+
+// Andere gasten in hetzelfde huishouden als g (zonder g zelf).
+export function householdMates(g, guests) {
+  const k = householdKey(g);
+  if (!k) return [];
+  return (guests || []).filter((x) => x.id !== g.id && householdKey(x) === k);
+}
